@@ -68,7 +68,7 @@
 					<button
 						type="button"
 						onclick={() => toggleGroup(i)}
-						class="rounded p-1 transition hover:bg-stone-200"
+						class="rounded-md p-1 transition hover:bg-stone-200"
 					>
 						<svg
 							class={'h-4 w-4 transition-transform ' + (group.expanded ? 'rotate-90' : '')}
@@ -78,7 +78,9 @@
 							<path d="M4 2l5 4-5 4z" />
 						</svg>
 					</button>
-					<div class="flex items-center gap-1 rounded px-2 py-0.5 text-lg">
+					<div
+						class="flex items-center gap-2 rounded-md px-2 py-0.5 text-lg transition hover:bg-stone-200"
+					>
 						<span class="relative inline-flex h-3 w-3 items-center justify-center">
 							<span class="absolute h-full w-full rounded-full bg-emerald-300/40"></span>
 							<span class="relative h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -89,6 +91,7 @@
 			</div>
 
 			{#if group.expanded}
+				<div class="mt-6 pl-2">Unit Name</div>
 				{#each group.items as task (task.id)}
 					<div
 						class="grid grid-cols-[1fr_180px_180px_140px] gap-4 border-b border-stone-700/30 py-2 transition hover:bg-stone-200"
