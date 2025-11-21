@@ -12,7 +12,6 @@
 
 	type Property = {
 		id: string;
-		name: string;
 		address: string;
 		expanded: boolean;
 		units: Unit[];
@@ -32,7 +31,6 @@
 	let properties = $state<Property[]>([
 		{
 			id: 'g1',
-			name: 'Property 1',
 			address: '3466 Belmont Terr.',
 			expanded: true,
 			units: [
@@ -43,7 +41,6 @@
 		},
 		{
 			id: 'g2',
-			name: 'Property 2',
 			address: '812 S 6th St.',
 			expanded: false,
 			units: [
@@ -147,16 +144,15 @@
 					</button>
 
 					<div
-						class="flex items-center gap-2 rounded-md px-2 py-0.5 text-lg transition hover:bg-stone-200"
+						class="text-md flex items-center gap-2 rounded-md px-2 py-0.5 transition hover:bg-stone-200"
 					>
 						<span class="relative inline-flex h-3 w-3 items-center justify-center">
 							<span class="absolute h-full w-full rounded-full bg-emerald-300/40"></span>
 							<span class="relative h-2 w-2 rounded-full bg-emerald-500"></span>
 						</span>
-						{property.name}
+						{property.address}
 					</div>
 				</div>
-				<div class="text-sm text-stone-500">{property.address}</div>
 			</div>
 
 			{#if property.expanded}

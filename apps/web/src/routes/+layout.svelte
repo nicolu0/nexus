@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-	<title>Nexus</title>/>
+	<title>Nexus</title>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
