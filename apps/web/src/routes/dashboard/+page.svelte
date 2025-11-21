@@ -165,11 +165,11 @@
 
 <div class="flex min-h-screen w-full flex-col bg-stone-50 font-sans">
 	<header
-		class="sticky top-0 z-20 flex w-full items-center justify-between border-b border-stone-200 bg-stone-50 px-8 py-4"
+		class="sticky top-0 z-20 flex w-full items-center justify-between border-b border-stone-200 bg-stone-50 px-8 py-3"
 	>
-		<div class="flex items-center gap-2">
-			<img src={nexusLogo} alt="Nexus logo" class="h-5 w-5" />
-			<span class="font-semibold tracking-tight text-stone-700">Nexus</span>
+		<div class="flex items-center gap-1">
+			<img src={nexusLogo} alt="Nexus logo" class="h-6 w-6" />
+			<span class="text-lg font-semibold tracking-tight text-stone-700">Nexus</span>
 		</div>
 		<div class="flex items-center gap-4">
 			<button
