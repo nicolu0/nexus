@@ -2,6 +2,7 @@
 	import { fly } from 'svelte/transition';
 
 	type UnitStatus = 'Not started' | 'In progress' | 'Done';
+	type DamageSeverity = 'Good' | 'Moderate' | 'Severe';
 
 	type Unit = {
 		id: string;
@@ -15,6 +16,16 @@
 		address: string;
 		expanded: boolean;
 		units: Unit[];
+	};
+
+	type Snapshot = {
+		severity: DamageSeverity;
+		timestamp: string;
+	};
+
+	type SectionDetail = {
+		name: string;
+		snapshots: Snapshot[];
 	};
 
 	let properties = $state<Property[]>([
@@ -41,6 +52,37 @@
 			]
 		}
 	]);
+
+	const detailSections: SectionDetail[] = [
+		{
+			name: 'Kitchen',
+			snapshots: [
+				{ severity: 'Severe', timestamp: 'Mar 2, 2024 • 2:15 PM' },
+				{ severity: 'Moderate', timestamp: 'Mar 5, 2024 • 8:05 AM' }
+			]
+		},
+		{
+			name: 'Bathroom',
+			snapshots: [
+				{ severity: 'Moderate', timestamp: 'Mar 1, 2024 • 4:18 PM' },
+				{ severity: 'Good', timestamp: 'Mar 6, 2024 • 10:02 AM' }
+			]
+		},
+		{
+			name: 'Living Room',
+			snapshots: [
+				{ severity: 'Severe', timestamp: 'Feb 27, 2024 • 5:44 PM' },
+				{ severity: 'Good', timestamp: 'Mar 4, 2024 • 12:31 PM' }
+			]
+		},
+		{
+			name: 'Bedroom 1',
+			snapshots: [
+				{ severity: 'Moderate', timestamp: 'Mar 3, 2024 • 9:20 AM' },
+				{ severity: 'Good', timestamp: 'Mar 6, 2024 • 6:50 PM' }
+			]
+		}
+	];
 
 	let selectedUnit: Unit | null = $state(null);
 	let openStatusUnitId: string | null = $state(null);
@@ -72,6 +114,12 @@
 		if (status === 'In progress') return 'bg-blue-500/15 text-blue-700 border-blue-500/30';
 		if (status === 'Done') return 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30';
 		return 'bg-stone-500/15 text-stone-700 border-stone-500/30';
+	}
+
+	function damageTagClasses(severity: DamageSeverity) {
+		if (severity === 'Severe') return 'bg-rose-500/15 text-rose-700';
+		if (severity === 'Moderate') return 'bg-amber-500/15 text-amber-700';
+		return 'bg-emerald-500/15 text-emerald-700';
 	}
 </script>
 
@@ -183,7 +231,7 @@
 
 	{#if selectedUnit}
 		<aside
-			class="fixed inset-y-0 right-0 z-30 flex h-full w-1/2 min-w-[320px] flex-col border-l border-stone-200 bg-white p-6 shadow-xl"
+			class="fixed inset-y-0 right-0 z-30 flex h-full w-1/2 min-w-[320px] flex-col border-l border-stone-200 bg-white p-6 pb-0 shadow-xl"
 			transition:fly={{ x: 200, duration: 200 }}
 			aria-label="Unit details"
 		>
@@ -199,13 +247,26 @@
 					Close
 				</button>
 			</div>
-			<div class="mt-6 flex-1 space-y-6 overflow-y-auto pr-2 text-stone-700">
-				{#each ['Kitchen', 'Bathroom', 'Living Room', 'Bedroom 1'] as section}
-					<div class="space-y-3">
-						<p class="text-sm font-medium tracking-wide text-stone-500 uppercase">{section}</p>
-						<div class="grid grid-cols-2 gap-3">
-							<div class="h-50 rounded-md bg-stone-300"></div>
-							<div class="h-50 rounded-md bg-stone-300"></div>
+			<div class="mt-6 flex-1 space-y-6 overflow-y-auto pr-2 pb-6 text-stone-700">
+				{#each detailSections as section}
+					<div class="space-y-4">
+						<p class="text-sm font-medium tracking-wide text-stone-500 uppercase">{section.name}</p>
+						<div class="grid grid-cols-2 gap-4">
+							{#each section.snapshots as snapshot}
+								<div class="overflow-hidden rounded-lg border border-stone-200 bg-white">
+									<div class="h-50 bg-stone-300"></div>
+									<div
+										class="flex items-center justify-between bg-stone-100 px-3 py-2 text-xs font-medium text-stone-500"
+									>
+										<span
+											class={`rounded-full px-2 py-0.5 text-xs font-semibold ${damageTagClasses(snapshot.severity)}`}
+										>
+											{snapshot.severity}
+										</span>
+										<span class="text-[11px] text-stone-400">{snapshot.timestamp}</span>
+									</div>
+								</div>
+							{/each}
 						</div>
 					</div>
 				{/each}
