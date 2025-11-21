@@ -111,70 +111,72 @@
 			</div>
 
 			{#if property.expanded}
-				<!-- units header -->
-				<div
-					class="mt-2 grid w-full grid-cols-[1fr_220px] gap-4 border-b border-stone-200 px-2 py-2 text-sm font-medium text-stone-500"
-				>
-					<div>Unit name</div>
-					<div>Status</div>
-				</div>
+				<div class="mt-2">
+					<!-- units header -->
+					<div
+						class="grid grid-cols-[240px_1fr] border-b border-stone-200 text-sm font-medium tracking-wide text-stone-500 uppercase"
+					>
+						<div class="px-3 py-2">Unit name</div>
+						<div class="px-3 py-2">Status</div>
+					</div>
 
-				<!-- units -->
-				{#each property.units as unit, j (unit.id)}
-					<div class="relative">
-						<div
-							class="grid w-full grid-cols-[1fr_220px] items-center gap-4 border-b border-stone-200 py-2 text-left transition"
-						>
+					<!-- units -->
+					{#each property.units as unit, j (unit.id)}
+						<div class="grid grid-cols-[240px_1fr] border-b border-stone-200 last:border-b-0">
 							<!-- unit name -->
 							<button
-								class="flex items-center gap-2 pl-2 text-stone-700"
+								class="flex w-full items-center gap-2 px-3 py-2 text-left text-stone-700"
 								onclick={() => openSidePeek(unit)}
 							>
-								<span class="h-1.5 w-1.5 rounded-full bg-stone-400"></span>
+								<span class="h-2 w-2 rounded-full bg-emerald-400"></span>
 								{unit.title}
 							</button>
 
 							<!-- status cell (clickable) -->
-							<div class="relative">
-								<button
-									type="button"
-									onclick={() => toggleStatusDropdown(unit.id)}
-									class={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm ${statusClasses(unit.status)} hover:opacity-80`}
-									aria-haspopup="listbox"
-									aria-expanded={openStatusUnitId === unit.id}
-								>
-									<span class="h-2 w-2 rounded-full bg-current opacity-70"></span>
-									{unit.status}
-									<svg class="h-3 w-3 opacity-70" viewBox="0 0 12 12" fill="currentColor">
-										<path d="M2 4l4 4 4-4z" />
-									</svg>
-								</button>
-
-								{#if openStatusUnitId === unit.id}
-									<div
-										class="absolute top-9 right-0 z-10 w-44 rounded-md border border-stone-200 bg-white p-1 shadow-lg"
-										role="listbox"
+							<div class="border-l border-stone-200 px-3 py-2">
+								<div class="relative">
+									<button
+										type="button"
+										onclick={() => toggleStatusDropdown(unit.id)}
+										class={`inline-flex w-full items-center justify-between gap-2 rounded-full border px-3 py-1 text-sm ${statusClasses(unit.status)} hover:opacity-80`}
+										aria-haspopup="listbox"
+										aria-expanded={openStatusUnitId === unit.id}
 									>
-										{#each ['Not started', 'In progress', 'Done'] as UnitStatus[] as s}
-											<button
-												type="button"
-												onclick={() => setUnitStatus(i, j, s)}
-												class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm text-stone-700 hover:bg-stone-100"
-												role="option"
-												aria-selected={unit.status === s}
-											>
-												<span>{s}</span>
-												{#if unit.status === s}
-													<span class="text-stone-400">✓</span>
-												{/if}
-											</button>
-										{/each}
-									</div>
-								{/if}
+										<span class="flex items-center gap-2">
+											<span class="h-2 w-2 rounded-full bg-current opacity-70"></span>
+											{unit.status}
+										</span>
+										<svg class="h-3 w-3 opacity-70" viewBox="0 0 12 12" fill="currentColor">
+											<path d="M2 4l4 4 4-4z" />
+										</svg>
+									</button>
+
+									{#if openStatusUnitId === unit.id}
+										<div
+											class="absolute top-9 right-0 z-10 w-44 rounded-md border border-stone-200 bg-white p-1 shadow-lg"
+											role="listbox"
+										>
+											{#each ['Not started', 'In progress', 'Done'] as UnitStatus[] as s}
+												<button
+													type="button"
+													onclick={() => setUnitStatus(i, j, s)}
+													class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm text-stone-700 hover:bg-stone-100"
+													role="option"
+													aria-selected={unit.status === s}
+												>
+													<span>{s}</span>
+													{#if unit.status === s}
+														<span class="text-stone-400">✓</span>
+													{/if}
+												</button>
+											{/each}
+										</div>
+									{/if}
+								</div>
 							</div>
 						</div>
-					</div>
-				{/each}
+					{/each}
+				</div>
 			{/if}
 		</div>
 	{/each}
