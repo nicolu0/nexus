@@ -1,24 +1,53 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import "../global.css";
+import { Stack } from "expo-router";
+import { useState, useEffect } from "react";
+import { View } from "react-native";
+import * as SplashScreenModule from "expo-splash-screen";
+import SplashScreen from "../components/SplashScreen";
+import { PhotoProvider } from "../context/PhotoContext";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+SplashScreenModule.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [isSplashAnimationFinished, setIsSplashAnimationFinished] = useState(false);
+
+  useEffect(() => {
+    async function prepare() {
+      try {
+        await SplashScreenModule.hideAsync();
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setIsAppReady(true);
+      }
+    }
+
+    prepare();
+  }, []);
+
+  if (isSplashAnimationFinished) {
+    return (
+      <PhotoProvider>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        </Stack>
+      </PhotoProvider>
+    );
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <View style={{ flex: 1 }}>
+      <PhotoProvider>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        </Stack>
+      </PhotoProvider>
+      <SplashScreen
+        isAppReady={isAppReady}
+        onAnimationFinish={() => setIsSplashAnimationFinished(true)}
+      />
+    </View>
   );
 }
