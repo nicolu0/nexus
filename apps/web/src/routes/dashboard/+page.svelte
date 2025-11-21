@@ -1,24 +1,26 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
 
-	type Task = {
+	type Unit = {
 		id: string;
 		title: string;
 	};
 
-	type Group = {
+	type Property = {
 		id: string;
 		name: string;
+		address: string;
 		expanded: boolean;
-		items: Task[];
+		units: Unit[];
 	};
 
-	let groups = $state<Group[]>([
+	let properties = $state<Property[]>([
 		{
 			id: 'g1',
 			name: 'Property 1',
+			address: '3466 Belmont Terr.',
 			expanded: true,
-			items: [
+			units: [
 				{
 					id: 't1',
 					title: 'Unit 1'
@@ -36,8 +38,9 @@
 		{
 			id: 'g2',
 			name: 'Property 2',
+			address: '812 S 6th St.',
 			expanded: false,
-			items: [
+			units: [
 				{
 					id: 't1',
 					title: 'Unit 1'
@@ -54,36 +57,36 @@
 		}
 	]);
 
-	let selectedTask: Task | null = $state(null);
+	let selectedUnit: Unit | null = $state(null);
 
-	function toggleGroup(i: number) {
-		groups[i].expanded = !groups[i].expanded;
+	function toggleProperty(i: number) {
+		properties[i].expanded = !properties[i].expanded;
 		// Svelte 5: reassign to trigger reactivity for nested change
-		groups = [...groups];
+		properties = [...properties];
 	}
 
-	function openSidePeek(task: Task) {
-		selectedTask = task;
+	function openSidePeek(unit: Unit) {
+		selectedUnit = unit;
 	}
 
 	function closeSidePeek() {
-		selectedTask = null;
+		selectedUnit = null;
 	}
 </script>
 
 <div class="flex min-h-screen w-full flex-col bg-stone-50 p-20 font-sans">
 	<h1 class="mb-10 text-4xl font-medium text-stone-900">Dashboard</h1>
-	{#each groups as group, i (group.id)}
+	{#each properties as property, i (property.id)}
 		<div class="mb-4">
-			<div class="grid w-full grid-cols-[1fr_180px_180px_140px] text-left">
+			<div class="grid w-full grid-cols-[1fr_auto] items-center gap-6 text-left">
 				<div class="flex items-center gap-2 font-medium text-stone-700">
 					<button
 						type="button"
-						onclick={() => toggleGroup(i)}
+						onclick={() => toggleProperty(i)}
 						class="rounded-md p-1 transition hover:bg-stone-200"
 					>
 						<svg
-							class={'h-4 w-4 transition-transform ' + (group.expanded ? 'rotate-90' : '')}
+							class={'h-4 w-4 transition-transform ' + (property.expanded ? 'rotate-90' : '')}
 							viewBox="0 0 12 12"
 							fill="currentColor"
 						>
@@ -97,27 +100,28 @@
 							<span class="absolute h-full w-full rounded-full bg-emerald-300/40"></span>
 							<span class="relative h-2 w-2 rounded-full bg-emerald-500"></span>
 						</span>
-						{group.name}
+						{property.name}
 					</div>
 				</div>
+				<div class="text-sm text-stone-500">{property.address}</div>
 			</div>
 
-			{#if group.expanded}
+			{#if property.expanded}
 				<div class="mt-6 pl-2">Unit Name</div>
-				{#each group.items as task (task.id)}
+				{#each property.units as unit (unit.id)}
 					<button
 						type="button"
-						onclick={() => openSidePeek(task)}
+						onclick={() => openSidePeek(unit)}
 						class="grid w-full grid-cols-[1fr_180px_180px_140px] gap-4 border-b border-stone-700/30 py-2 text-left transition hover:bg-stone-200"
 					>
-						<div class="pl-2 text-stone-700">{task.title}</div>
+						<div class="pl-2 text-stone-700">{unit.title}</div>
 					</button>
 				{/each}
 			{/if}
 		</div>
 	{/each}
 
-	{#if selectedTask}
+	{#if selectedUnit}
 		<aside
 			class="fixed inset-y-0 right-0 z-30 w-1/2 min-w-[320px] border-l border-stone-200 bg-white p-6 shadow-xl"
 			transition:fly={{ x: 200, duration: 200 }}
@@ -126,7 +130,7 @@
 			<div class="flex items-center justify-between border-b border-stone-200 pb-4">
 				<div>
 					<p class="text-sm text-stone-400 uppercase">Unit</p>
-					<h2 class="text-2xl font-semibold text-stone-900">{selectedTask.title}</h2>
+					<h2 class="text-2xl font-semibold text-stone-900">{selectedUnit.title}</h2>
 				</div>
 				<button
 					type="button"
@@ -139,8 +143,8 @@
 			<div class="mt-6 space-y-4 text-stone-700">
 				<p class="text-sm text-stone-500">Details</p>
 				<p>
-					This is placeholder content for <span class="font-medium">{selectedTask.title}</span>. Replace with
-					actual unit information.
+					This is placeholder content for <span class="font-medium">{selectedUnit.title}</span>.
+					Replace with actual unit information.
 				</p>
 			</div>
 		</aside>
