@@ -21,6 +21,7 @@
 	type Snapshot = {
 		severity: DamageSeverity;
 		timestamp: string;
+		hasPhoto?: boolean;
 	};
 
 	type SectionDetail = {
@@ -57,8 +58,8 @@
 		{
 			name: 'Kitchen',
 			snapshots: [
-				{ severity: 'Severe', timestamp: 'Mar 2, 2024 • 2:15 PM' },
-				{ severity: 'Moderate', timestamp: 'Mar 5, 2024 • 8:05 AM' }
+				{ severity: 'Severe', timestamp: 'Mar 2, 2024 • 2:15 PM', hasPhoto: true },
+				{ severity: 'Moderate', timestamp: 'Mar 5, 2024 • 8:05 AM', hasPhoto: false }
 			]
 		},
 		{
@@ -253,19 +254,34 @@
 						<p class="text-sm font-medium tracking-wide text-stone-500 uppercase">{section.name}</p>
 						<div class="grid grid-cols-2 gap-4">
 							{#each section.snapshots as snapshot}
-								<div class="overflow-hidden rounded-lg border border-stone-200 bg-white">
-									<div class="h-50 bg-stone-300"></div>
-									<div
-										class="flex items-center justify-between bg-stone-100 px-3 py-2 text-xs font-medium text-stone-500"
-									>
-										<span
-											class={`rounded-full px-2 py-0.5 text-xs font-semibold ${damageTagClasses(snapshot.severity)}`}
+								{#if snapshot.hasPhoto !== false}
+									<div class="overflow-hidden rounded-lg border border-stone-200 bg-white">
+										<div class="relative h-50 bg-stone-300"></div>
+										<div
+											class="flex items-center justify-between bg-stone-100 px-3 py-2 text-xs font-medium text-stone-500"
 										>
-											{snapshot.severity}
-										</span>
-										<span class="text-[11px] text-stone-400">{snapshot.timestamp}</span>
+											<span
+												class={`rounded-full px-2 py-0.5 text-xs font-semibold ${damageTagClasses(snapshot.severity)}`}
+											>
+												{snapshot.severity}
+											</span>
+											<span class="text-[11px] text-stone-400">{snapshot.timestamp}</span>
+										</div>
 									</div>
-								</div>
+								{:else}
+									<div
+										class="overflow-hidden rounded-lg border border-dashed border-stone-200 bg-white"
+									>
+										<div class="relative h-50 bg-transparent"></div>
+										<div
+											class="flex items-center justify-between bg-stone-100 px-3 py-2 text-xs font-medium text-stone-500"
+										>
+											<span class={`rounded-full px-2 py-0.5 text-xs font-semibold`}>
+												No Status
+											</span>
+										</div>
+									</div>
+								{/if}
 							{/each}
 						</div>
 					</div>
