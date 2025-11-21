@@ -107,14 +107,17 @@
 			</div>
 
 			{#if property.expanded}
-				<div class="mt-6 pl-2">Unit Name</div>
+				<div class="mt-2 p-2">Unit Name</div>
 				{#each property.units as unit (unit.id)}
 					<button
 						type="button"
 						onclick={() => openSidePeek(unit)}
 						class="grid w-full grid-cols-[1fr_180px_180px_140px] gap-4 border-b border-stone-700/30 py-2 text-left transition hover:bg-stone-200"
 					>
-						<div class="pl-2 text-stone-700">{unit.title}</div>
+						<div class="flex items-center gap-2 pl-2 text-stone-700">
+							<span class="h-1.5 w-1.5 rounded-full bg-stone-400"></span>
+							{unit.title}
+						</div>
 					</button>
 				{/each}
 			{/if}
