@@ -118,9 +118,6 @@
 	{/each}
 
 	{#if selectedTask}
-		<div class="fixed inset-0 z-20">
-			<button class="h-full w-full" type="button" aria-label="Close"></button>
-		</div>
 		<aside
 			class="fixed inset-y-0 right-0 z-30 w-1/2 min-w-[320px] border-l border-stone-200 bg-white p-6 shadow-xl"
 			transition:fly={{ x: 200, duration: 200 }}
@@ -142,8 +139,8 @@
 			<div class="mt-6 space-y-4 text-stone-700">
 				<p class="text-sm text-stone-500">Details</p>
 				<p>
-					This is placeholder content for <span class="font-medium">{selectedTask.title}</span>.
-					Replace with actual unit information.
+					This is placeholder content for <span class="font-medium">{selectedTask.title}</span>. Replace with
+					actual unit information.
 				</p>
 			</div>
 		</aside>
