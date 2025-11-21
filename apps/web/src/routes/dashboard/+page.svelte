@@ -24,9 +24,9 @@
 			address: '3466 Belmont Terr.',
 			expanded: true,
 			units: [
-				{ id: 'g1-t1', title: 'Unit 1', status: 'Not started' },
-				{ id: 'g1-t2', title: 'Unit 2', status: 'Not started' },
-				{ id: 'g1-t3', title: 'Unit 3', status: 'Not started' }
+				{ id: 'g1-t1', title: 'Unit 100', status: 'Not started' },
+				{ id: 'g1-t2', title: 'Unit 200', status: 'Not started' },
+				{ id: 'g1-t3', title: 'Unit 300', status: 'Not started' }
 			]
 		},
 		{
@@ -35,9 +35,9 @@
 			address: '812 S 6th St.',
 			expanded: false,
 			units: [
-				{ id: 'g2-t1', title: 'Unit 1', status: 'Not started' },
-				{ id: 'g2-t2', title: 'Unit 2', status: 'Not started' },
-				{ id: 'g2-t3', title: 'Unit 3', status: 'Not started' }
+				{ id: 'g2-t1', title: 'Unit 100', status: 'Not started' },
+				{ id: 'g2-t2', title: 'Unit 200', status: 'Not started' },
+				{ id: 'g2-t3', title: 'Unit 300', status: 'Not started' }
 			]
 		}
 	]);
@@ -122,7 +122,7 @@
 
 					<!-- units -->
 					{#each property.units as unit, j (unit.id)}
-						<div class="grid grid-cols-[240px_1fr] border-b border-stone-200 last:border-b-0">
+						<div class="grid grid-cols-[240px_1fr] border-b border-stone-200">
 							<!-- unit name -->
 							<button
 								class="flex w-full items-center gap-2 px-3 py-2 text-left text-stone-700"
@@ -183,13 +183,12 @@
 
 	{#if selectedUnit}
 		<aside
-			class="fixed inset-y-0 right-0 z-30 w-1/2 min-w-[320px] border-l border-stone-200 bg-white p-6 shadow-xl"
+			class="fixed inset-y-0 right-0 z-30 flex h-full w-1/2 min-w-[320px] flex-col border-l border-stone-200 bg-white p-6 shadow-xl"
 			transition:fly={{ x: 200, duration: 200 }}
 			aria-label="Unit details"
 		>
 			<div class="flex items-center justify-between border-b border-stone-200 pb-4">
 				<div>
-					<p class="text-sm text-stone-400 uppercase">Unit</p>
 					<h2 class="text-2xl font-semibold text-stone-900">{selectedUnit.title}</h2>
 				</div>
 				<button
@@ -200,12 +199,16 @@
 					Close
 				</button>
 			</div>
-			<div class="mt-6 space-y-4 text-stone-700">
-				<p class="text-sm text-stone-500">Details</p>
-				<p>
-					This is placeholder content for <span class="font-medium">{selectedUnit.title}</span>.
-					Replace with actual unit information.
-				</p>
+			<div class="mt-6 flex-1 space-y-6 overflow-y-auto pr-2 text-stone-700">
+				{#each ['Kitchen', 'Bathroom', 'Living Room', 'Bedroom 1'] as section}
+					<div class="space-y-3">
+						<p class="text-sm font-medium tracking-wide text-stone-500 uppercase">{section}</p>
+						<div class="grid grid-cols-2 gap-3">
+							<div class="h-50 rounded-md bg-stone-300"></div>
+							<div class="h-50 rounded-md bg-stone-300"></div>
+						</div>
+					</div>
+				{/each}
 			</div>
 		</aside>
 	{/if}
