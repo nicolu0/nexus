@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, Dimensions } from 'react-native';
+import { View, Dimensions } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import Animated, {
     useSharedValue,
@@ -48,8 +48,8 @@ export default function SplashScreen({ isAppReady, onAnimationFinish }: SplashSc
     }, [isAppReady]);
 
     return (
-        <View style={styles.container}>
-            <Animated.View style={[styles.iconContainer, animatedStyle]}>
+        <View className="absolute inset-0 bg-[#fafafa] justify-center items-center z-[9999]">
+            <Animated.View className="justify-center items-center" style={animatedStyle}>
                 <Svg width="100" height="102" viewBox="0 0 179 182" fill="none">
                     {/* Background Rect - keeping it but maybe we want transparent? 
               The SVG has a white background rect. I'll include it as per file. */}
@@ -63,17 +63,3 @@ export default function SplashScreen({ isAppReady, onAnimationFinish }: SplashSc
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#fafafa', // Match the SVG background or app theme
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 9999,
-    },
-    iconContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-});

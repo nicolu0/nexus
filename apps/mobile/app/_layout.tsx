@@ -38,7 +38,7 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View className="flex-1">
       <PhotoProvider>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

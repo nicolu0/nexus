@@ -9,11 +9,11 @@ export default function Dashboard() {
   const { photos } = usePhotos();
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff', padding: 16 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>Dashboard</Text>
+    <View className="flex-1 bg-white p-4">
+      <Text className="text-2xl font-bold mb-4">Dashboard</Text>
       {photos.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: '#888' }}>No photos yet. Go to Camera tab!</Text>
+        <View className="flex-1 justify-center items-center">
+          <Text className="text-gray-500">No photos yet. Go to Camera tab!</Text>
         </View>
       ) : (
         <FlatList
@@ -23,13 +23,8 @@ export default function Dashboard() {
           renderItem={({ item }) => (
             <Image
               source={{ uri: item }}
-              style={{
-                width: IMAGE_SIZE,
-                height: IMAGE_SIZE,
-                margin: 4,
-                borderRadius: 8,
-                backgroundColor: '#eee'
-              }}
+              style={{ width: IMAGE_SIZE, height: IMAGE_SIZE }}
+              className="m-1 rounded-lg bg-gray-200"
             />
           )}
         />
