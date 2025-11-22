@@ -10,9 +10,11 @@
 		updatePropertyAt,
 		updateUnitStatus,
 		fetchUnitImages,
+		uploadUnitImage,
 		type UnitRecord,
 		type UnitStatus,
-		type UnitImageRecord
+		type UnitImageRecord,
+		type UnitImagePhase
 	} from '$lib/stores/properties';
 	import nexusLogo from '$lib/assets/nexus.svg';
 
@@ -21,9 +23,30 @@
 		snapshots: {
 			id: string;
 			url: string | null;
-			phase: 'before' | 'after';
+			phase: UnitImagePhase;
+			sort_order: number;
 			created_at: string | null;
 		}[];
+	};
+
+	const orderedPhases: UnitImagePhase[] = ['move_in', 'move_out_before', 'move_out_after'];
+
+	const phaseMetadata: Record<UnitImagePhase, { label: string; helper: string; pillClass: string }> = {
+		move_in: {
+			label: 'Move-in',
+			helper: 'Upload move-in',
+			pillClass: 'bg-sky-500/15 text-sky-700'
+		},
+		move_out_before: {
+			label: 'Move-out (before)',
+			helper: 'Upload move-out before',
+			pillClass: 'bg-stone-500/15 text-stone-700'
+		},
+		move_out_after: {
+			label: 'Move-out (after)',
+			helper: 'Upload move-out after',
+			pillClass: 'bg-emerald-500/15 text-emerald-700'
+		}
 	};
 
 	let selectedUnit: UnitRecord | null = $state(null);
@@ -38,6 +61,17 @@
 	let unitImagesLoading = $state(false);
 	let unitImagesError = $state('');
 	let unitImageSections = $state<UnitImageSection[]>([]);
+	let newSectionName = $state('New Section');
+	let uploadError = $state('');
+	let uploadingPhase: UnitImagePhase | null = $state(null);
+
+	const uploadPhases: { phase: UnitImagePhase; label: string; helper: string }[] = orderedPhases.map(
+		(phase) => ({
+			phase,
+			label: phaseMetadata[phase].label,
+			helper: `${phaseMetadata[phase].helper} photo`
+		})
+	);
 
 	onMount(async () => {
 		await loadPropertiesFromSupabase();
@@ -70,6 +104,9 @@
 
 	function openSidePeek(unit: UnitRecord) {
 		selectedUnit = unit;
+		newSectionName = 'New Section';
+		uploadError = '';
+		uploadingPhase = null;
 		loadUnitImages(unit.id);
 	}
 
@@ -77,6 +114,9 @@
 		selectedUnit = null;
 		unitImageSections = [];
 		unitImagesError = '';
+		newSectionName = 'New Section';
+		uploadError = '';
+		uploadingPhase = null;
 	}
 
 	function toggleStatusDropdown(unitId: string) {
@@ -136,10 +176,12 @@
 		const map = new Map<string, UnitImageSection>();
 		images.forEach((image) => {
 			const existing = map.get(image.section) ?? { name: image.section, snapshots: [] };
+			const sortOrder = typeof image.sort_order === 'number' ? image.sort_order : 0;
 			existing.snapshots.push({
 				id: image.id,
 				url: image.url,
 				phase: image.phase,
+				sort_order: sortOrder,
 				created_at: image.created_at
 			});
 			map.set(image.section, existing);
@@ -147,21 +189,37 @@
 
 		return Array.from(map.values()).map((section) => ({
 			...section,
-			snapshots: section.snapshots.sort((a, b) => (a.phase > b.phase ? 1 : -1))
+			snapshots: section.snapshots.sort((a, b) => {
+				if (a.sort_order !== b.sort_order) {
+					return a.sort_order - b.sort_order;
+				}
+				const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+				const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+				return aTime - bTime;
+			})
 		}));
 	}
 
-	async function loadUnitImages(unitId: string) {
-		unitImagesLoading = true;
+	type LoadUnitImagesOptions = {
+		silent?: boolean;
+	};
+
+	async function loadUnitImages(unitId: string, options: LoadUnitImagesOptions = {}) {
+		const silent = options.silent ?? false;
+		if (!silent) {
+			unitImagesLoading = true;
+			unitImageSections = [];
+		}
 		unitImagesError = '';
-		unitImageSections = [];
 		try {
 			const images = await fetchUnitImages(unitId);
 			unitImageSections = buildSections(images);
 		} catch (err) {
 			unitImagesError = err instanceof Error ? err.message : 'Unable to load images.';
 		} finally {
-			unitImagesLoading = false;
+			if (!silent) {
+				unitImagesLoading = false;
+			}
 		}
 	}
 
@@ -175,6 +233,39 @@
 			hour: 'numeric',
 			minute: '2-digit'
 		});
+	}
+
+	function handleDropUpload(event: DragEvent, phase: UnitImagePhase) {
+		const file = event.dataTransfer?.files?.[0];
+		if (!file) return;
+		void processUpload(file, phase);
+	}
+
+	function handleFileInputChange(event: Event, phase: UnitImagePhase) {
+		const target = event.currentTarget as HTMLInputElement;
+		const file = target.files?.[0] ?? null;
+		if (!file) return;
+		void processUpload(file, phase);
+		target.value = '';
+	}
+
+	async function processUpload(file: File | null, phase: UnitImagePhase) {
+		if (!file || !selectedUnit || uploadingPhase) return;
+		uploadError = '';
+		uploadingPhase = phase;
+		try {
+			await uploadUnitImage({
+				unitId: selectedUnit.id,
+				sectionName: newSectionName,
+				phase,
+				file
+			});
+			await loadUnitImages(selectedUnit.id, { silent: true });
+		} catch (err) {
+			uploadError = err instanceof Error ? err.message : 'Unable to upload photo.';
+		} finally {
+			uploadingPhase = null;
+		}
 	}
 
 	async function logout() {
@@ -373,38 +464,118 @@
 				</div>
 				<div class="flex-1 space-y-6 overflow-y-auto pt-4 pr-2 pb-6 text-stone-700">
 					{#if unitImagesLoading}
-						<div class="rounded-lg border border-dashed border-stone-300 bg-white/70 px-4 py-6 text-center text-sm text-stone-500">
+						<div
+							class="rounded-lg border border-dashed border-stone-300 bg-white/70 px-4 py-6 text-center text-sm text-stone-500"
+						>
 							Loading photos...
 						</div>
 					{:else if unitImagesError}
-						<div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{unitImagesError}</div>
+						<div
+							class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600"
+						>
+							{unitImagesError}
+						</div>
 					{:else if unitImageSections.length === 0}
-						<div class="rounded-lg border border-dashed border-stone-200 bg-white/70 px-4 py-6 text-center text-sm text-stone-500">
-							No photos for this unit yet.
+						<div
+							class="space-y-5 rounded-2xl border border-dashed border-stone-200 bg-white/70 px-5 py-6"
+						>
+							<div>
+								<label
+									for="new-section-input"
+									class="mb-2 block text-xs font-semibold tracking-wide text-stone-500 uppercase"
+								>
+									Section title
+								</label>
+								<input
+									id="new-section-input"
+									type="text"
+									class="w-full rounded-xl border border-stone-200 bg-white/80 px-3 py-2 text-sm text-stone-700 shadow-inner focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:outline-none"
+									placeholder="New Section"
+									bind:value={newSectionName}
+								/>
+							</div>
+							<div class="grid grid-cols-2 gap-5">
+								{#each uploadPhases as { phase, label, helper }}
+									<label
+										class="group relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-200 bg-white/60 text-center text-stone-500 transition hover:border-stone-300 hover:bg-white"
+										ondrop={(event) => handleDropUpload(event, phase)}
+										aria-busy={uploadingPhase === phase}
+									>
+										<input
+											class="sr-only"
+											type="file"
+											accept="image/*"
+											aria-label={`Upload ${label.toLowerCase()} photo`}
+											name={`upload-${phase}`}
+											onchange={(event) => handleFileInputChange(event, phase)}
+										/>
+										{#if uploadingPhase === phase}
+											<div
+												class="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-white/80 text-stone-500"
+											>
+												<svg
+													class="h-6 w-6 animate-spin text-stone-400"
+													viewBox="0 0 24 24"
+													fill="none"
+												>
+													<circle
+														class="opacity-25"
+														cx="12"
+														cy="12"
+														r="10"
+														stroke="currentColor"
+														stroke-width="4"
+													/>
+													<path
+														class="opacity-75"
+														fill="currentColor"
+														d="M4 12a8 8 0 018-8v4l3-3-3-3v4a12 12 0 00-12 12h4z"
+													/>
+												</svg>
+												<span class="text-xs font-medium tracking-wide uppercase">Uploading</span>
+											</div>
+										{/if}
+										<span class="text-xs font-semibold tracking-[0.3em] text-stone-400 uppercase"
+											>{label}</span
+										>
+										<span class="text-base font-semibold text-stone-700">{helper}</span>
+										<span class="text-xs text-stone-400">Click or drag a photo here</span>
+									</label>
+								{/each}
+							</div>
+							{#if uploadError}
+								<div class="text-sm text-rose-600">{uploadError}</div>
+							{/if}
 						</div>
 					{:else}
 						{#each unitImageSections as section}
 							<div class="space-y-4">
-								<p class="text-sm font-medium uppercase tracking-wide text-stone-500">{section.name}</p>
+								<p class="text-sm font-medium tracking-wide text-stone-500 uppercase">
+									{section.name}
+								</p>
 								<div class="grid grid-cols-2 gap-4">
 									{#each section.snapshots as snapshot}
 										<div class="overflow-hidden rounded-lg border border-stone-200 bg-white">
 											{#if snapshot.url}
-												<img src={snapshot.url} alt={`${snapshot.phase} photo of ${section.name}`} class="h-50 w-full object-cover" />
+												<img
+													src={snapshot.url}
+													alt={`${phaseMetadata[snapshot.phase].label} photo of ${section.name}`}
+													class="h-50 w-full object-cover"
+												/>
 											{:else}
 												<div class="h-50 bg-stone-200"></div>
 											{/if}
-											<div class="flex items-center justify-between bg-stone-100 px-3 py-2 text-xs font-medium text-stone-500">
+											<div
+												class="flex items-center justify-between bg-stone-100 px-3 py-2 text-xs font-medium text-stone-500"
+											>
 												<span
-													class={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-														snapshot.phase === 'before'
-															? 'bg-stone-500/15 text-stone-700'
-															: 'bg-emerald-500/15 text-emerald-700'
-													}`}
+													class={`rounded-full px-2 py-0.5 text-xs font-semibold ${phaseMetadata[snapshot.phase].pillClass}`}
 												>
-													{snapshot.phase === 'before' ? 'Before' : 'After'}
+													{phaseMetadata[snapshot.phase].label}
 												</span>
-												<span class="text-[11px] text-stone-400">{formatTimestamp(snapshot.created_at)}</span>
+												<span class="text-[11px] text-stone-400"
+													>{formatTimestamp(snapshot.created_at)}</span
+												>
 											</div>
 										</div>
 									{/each}

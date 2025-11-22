@@ -3,6 +3,8 @@ import { writable } from 'svelte/store';
 
 export type UnitStatus = 'Not started' | 'In progress' | 'Done';
 
+export type UnitImagePhase = 'move_in' | 'move_out_before' | 'move_out_after';
+
 export type UnitRecord = {
 	id: string;
 	title: string;
@@ -12,7 +14,7 @@ export type UnitRecord = {
 export type UnitImageRecord = {
 	id: string;
 	section: string;
-	phase: 'before' | 'after';
+	phase: UnitImagePhase;
 	bucket: string;
 	path: string;
 	mime_type: string | null;
@@ -20,6 +22,8 @@ export type UnitImageRecord = {
 	created_at: string | null;
 	url: string | null;
 };
+
+const UNIT_IMAGES_BUCKET = 'Images';
 
 export type PropertyRecord = {
 	id: string;
@@ -170,13 +174,13 @@ export async function createPropertyOptimistic(input: CreatePropertyInput) {
 			current.map((property) =>
 				property.id === optimisticId
 					? {
-							...property,
-							id: insertedProperty.id,
-							name: insertedProperty.name ?? propertyName,
-							address: formatAddress(insertedProperty),
-							expanded: true,
-							units: persistedUnits
-					  }
+						...property,
+						id: insertedProperty.id,
+						name: insertedProperty.name ?? propertyName,
+						address: formatAddress(insertedProperty),
+						expanded: true,
+						units: persistedUnits
+					}
 					: property
 			)
 		);
@@ -208,8 +212,8 @@ export async function fetchUnitImages(unitId: string): Promise<UnitImageRecord[]
 		.select('id, section_name, phase, bucket, path, mime_type, sort_order, created_at')
 		.eq('unit_id', unitId)
 		.order('section_name', { ascending: true })
-		.order('phase', { ascending: true })
-		.order('sort_order', { ascending: true });
+		.order('sort_order', { ascending: true })
+		.order('phase', { ascending: true });
 
 	if (error) {
 		throw error;
@@ -220,7 +224,7 @@ export async function fetchUnitImages(unitId: string): Promise<UnitImageRecord[]
 		return {
 			id: row.id,
 			section: row.section_name,
-			phase: row.phase as 'before' | 'after',
+			phase: row.phase as UnitImagePhase,
 			bucket: row.bucket,
 			path: row.path,
 			mime_type: row.mime_type,
@@ -229,4 +233,86 @@ export async function fetchUnitImages(unitId: string): Promise<UnitImageRecord[]
 			url: publicUrl
 		};
 	});
+}
+
+export type UploadUnitImageInput = {
+	unitId: string;
+	sectionName: string;
+	phase: UnitImagePhase;
+	file: File;
+};
+
+export async function uploadUnitImage(input: UploadUnitImageInput): Promise<UnitImageRecord> {
+	const sectionName = input.sectionName.trim() || 'New Section';
+	const bucket = UNIT_IMAGES_BUCKET;
+	const filePath = buildImagePath(input.unitId, sectionName, input.phase, input.file);
+
+	const { error: storageError } = await supabase.storage
+		.from(bucket)
+		.upload(filePath, input.file, {
+			contentType: input.file.type || undefined,
+			upsert: true
+		});
+
+	if (storageError) {
+		console.log('BUCKET ERROR')
+		throw storageError;
+	}
+
+	const { data, error: insertError } = await supabase
+		.from('images')
+		.insert({
+			unit_id: input.unitId,
+			section_name: sectionName,
+			phase: input.phase,
+			bucket,
+			path: filePath,
+			mime_type: input.file.type || null,
+			sort_order:
+				input.phase === 'move_in' ? 0 : input.phase === 'move_out_before' ? 1 : 2
+		})
+		.select('id, section_name, phase, bucket, path, mime_type, sort_order, created_at')
+		.single();
+
+	if (insertError || !data) {
+		console.log('INSERT ERROR')
+		console.log('insertError', insertError)
+		await supabase.storage.from(bucket).remove([filePath]);
+		throw insertError ?? new Error('Unable to save image record.');
+	}
+
+	const publicUrl = supabase.storage.from(bucket).getPublicUrl(filePath).data?.publicUrl ?? null;
+
+	return {
+		id: data.id,
+		section: data.section_name,
+		phase: data.phase as UnitImagePhase,
+		bucket: data.bucket,
+		path: data.path,
+		mime_type: data.mime_type,
+		sort_order: data.sort_order,
+		created_at: data.created_at,
+		url: publicUrl
+	};
+}
+
+function buildImagePath(unitId: string, sectionName: string, phase: UnitImagePhase, file: File) {
+	const sectionSlug = slugify(sectionName) || 'section';
+	const extension = extractExtension(file.name) || 'jpg';
+	const timestamp = Date.now();
+	const unique = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+	return `${unitId}/${sectionSlug}/${phase}-${timestamp}-${unique}.${extension}`;
+}
+
+function slugify(value: string) {
+	return value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+}
+
+function extractExtension(name: string) {
+	const parts = name?.split('.') ?? [];
+	if (parts.length < 2) return null;
+	return parts.pop()?.toLowerCase() ?? null;
 }
