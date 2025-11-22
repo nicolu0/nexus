@@ -3,7 +3,7 @@
 	import { fade, scale } from 'svelte/transition';
 	import nexusLogo from '$lib/assets/nexus.svg';
 
-	type Severity = 'low' | 'medium' | 'high';
+	type Severity = 'low' | 'medium' | 'high' | 'yc';
 
 	const {
 		top = '50%',
@@ -51,7 +51,13 @@
 	});
 
 	const dotColor = $derived(
-		severity === 'high' ? 'bg-rose-500' : severity === 'medium' ? 'bg-amber-400' : 'bg-emerald-500'
+		severity === 'high'
+			? 'bg-rose-500'
+			: severity === 'medium'
+				? 'bg-amber-400'
+				: severity === 'yc'
+					? 'bg-orange-500'
+					: 'bg-emerald-500'
 	);
 
 	// Pop-in after delay
@@ -106,7 +112,16 @@
 		       whitespace-nowrap shadow-sm"
 			in:scale={{ start: 0.9, duration: 220, delay: 200 }}
 		>
-			<div class={`h-2 w-2 rounded-full ${dotColor}`} />
+			<div class="relative grid h-3 w-3 place-items-center">
+				<!-- pinging outer ring, scaled down -->
+				<div
+					class={`absolute inset-0 rounded-full ${dotColor} origin-center scale-75 animate-ping opacity-40`}
+					style="animation-duration: 1.6s;"
+				/>
+
+				<!-- inner dot -->
+				<div class={`h-2 w-2 rounded-full ${dotColor}`} />
+			</div>
 			<div class="text-[10px] font-medium tracking-tight text-stone-900">
 				{message}
 			</div>
