@@ -1,17 +1,17 @@
 <script lang="ts">
-import { fly } from 'svelte/transition';
-import { onMount } from 'svelte';
-import { goto } from '$app/navigation';
-import supabase from '$lib/supabaseClient';
-import {
-	propertiesStore,
-	fetchProperties,
-	createPropertyOptimistic,
-	updatePropertyAt,
-	updateUnitStatus,
-	type UnitRecord,
-	type UnitStatus
-} from '$lib/stores/properties';
+	import { fly } from 'svelte/transition';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import supabase from '$lib/supabaseClient';
+	import {
+		propertiesStore,
+		fetchProperties,
+		createPropertyOptimistic,
+		updatePropertyAt,
+		updateUnitStatus,
+		type UnitRecord,
+		type UnitStatus
+	} from '$lib/stores/properties';
 	import nexusLogo from '$lib/assets/nexus.svg';
 
 	type DamageSeverity = 'Good' | 'Moderate' | 'Severe';
@@ -159,15 +159,15 @@ import {
 		createPropertyError = '';
 	}
 
-function closeCreatePropertyModal() {
-	createPropertyError = '';
-	showCreatePropertyModal = false;
-}
+	function closeCreatePropertyModal() {
+		createPropertyError = '';
+		showCreatePropertyModal = false;
+	}
 
-async function logout() {
-	await supabase.auth.signOut();
-	await goto('/');
-}
+	async function logout() {
+		await supabase.auth.signOut();
+		await goto('/');
+	}
 </script>
 
 <div class="flex min-h-screen w-full flex-col bg-stone-50 font-sans">
@@ -176,7 +176,7 @@ async function logout() {
 	>
 		<div class="flex items-center gap-1">
 			<img src={nexusLogo} alt="Nexus logo" class="h-6 w-6" />
-			<span class="text-lg font-semibold tracking-tight text-stone-700">Nexus</span>
+			<span class="text-lg font-semibold tracking-tight text-stone-700">Lattice</span>
 		</div>
 		<div class="flex items-center gap-4">
 			<button
@@ -206,7 +206,7 @@ async function logout() {
 		</div>
 	</header>
 
-	<div class="flex-1 px-20 py-12">
+	<div class="flex-1 px-20 py-10">
 		<div class="mb-6 flex items-center justify-between">
 			<h1 class="text-4xl font-medium text-stone-900">Dashboard</h1>
 			<button
@@ -342,11 +342,11 @@ async function logout() {
 
 		{#if selectedUnit}
 			<aside
-				class="fixed inset-y-0 right-0 z-30 flex h-full w-1/2 min-w-[320px] flex-col border-l border-stone-200 bg-white p-6 shadow-xl"
+				class="fixed inset-y-0 right-0 z-30 flex h-full w-1/2 min-w-[320px] flex-col border-l border-stone-200 bg-white p-6 pb-0 shadow-xl"
 				transition:fly={{ x: 200, duration: 200 }}
 				aria-label="Unit details"
 			>
-				<div class="flex items-center justify-between border-b border-stone-200 pb-4">
+				<div class="flex items-center justify-between border-b border-stone-200 pb-2">
 					<div>
 						<h2 class="text-2xl font-semibold text-stone-900">{selectedUnit.title}</h2>
 					</div>
@@ -358,7 +358,7 @@ async function logout() {
 						Close
 					</button>
 				</div>
-				<div class="mt-6 flex-1 space-y-6 overflow-y-auto pr-2 pb-6 text-stone-700">
+				<div class="flex-1 space-y-6 overflow-y-auto pt-4 pr-2 pb-6 text-stone-700">
 					{#each detailSections as section}
 						<div class="space-y-4">
 							<p class="text-sm font-medium tracking-wide text-stone-500 uppercase">

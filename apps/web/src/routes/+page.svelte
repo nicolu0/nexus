@@ -90,7 +90,7 @@
 		<div class="container mx-auto flex items-center justify-between">
 			<div class="flex items-center gap-0.5">
 				<img src={nexusLogo} alt="Nexus logo" class="h-8 w-8" />
-				<span class="text-lg font-medium tracking-tight text-stone-700">Nexus</span>
+				<span class="text-lg font-medium tracking-tight text-stone-700">Lattice</span>
 			</div>
 			<div class="hidden items-center gap-8 text-sm font-medium text-stone-600 md:flex">
 				<a href="#features" class="transition-colors hover:text-stone-900">Features</a>
