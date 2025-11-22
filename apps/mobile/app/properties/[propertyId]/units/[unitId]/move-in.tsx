@@ -1,3 +1,5 @@
+// apps/mobile/app/properties/[propertyId]/units/[unitId]/move-in.tsx
+
 import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -10,8 +12,8 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { usePhotos } from '@/context/PhotoContext';
-import { supabase } from '@/lib/supabase';
+import { usePhotos } from '../../../../../context/PhotoContext';
+import { supabase } from '../../../../../lib/supabase';
 
 type SectionKey =
   | 'entry'
@@ -48,8 +50,6 @@ const INITIAL_SECTIONS: Omit<Section, 'photos'>[] = [
   { key: 'closets', label: 'Closets', minPhotos: 1 },
 ];
 
-// Upload a photo file:// URI to Supabase Storage (bucket "Images" for now)
-// Later you can change "raw/..." to unit/tenancy-aware paths and insert into your images table.
 async function uploadPhotoToSupabase(uri: string) {
   const response = await fetch(uri);
   const blob = await response.blob();
@@ -70,7 +70,9 @@ async function uploadPhotoToSupabase(uri: string) {
     throw error;
   }
 
-  const { data: publicData } = supabase.storage.from('Images').getPublicUrl(path);
+  const { data: publicData } = supabase.storage
+    .from('Images')
+    .getPublicUrl(path);
 
   return {
     storagePath: path,
@@ -84,12 +86,13 @@ export default function MoveInScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
 
-  const { propertyId, propertyName, unitId, unitLabel } = useLocalSearchParams<{
-    propertyId: string;
-    propertyName?: string;
-    unitId: string;
-    unitLabel?: string;
-  }>();
+  const { propertyId, propertyName, unitId, unitLabel } =
+    useLocalSearchParams<{
+      propertyId: string;
+      propertyName?: string;
+      unitId: string;
+      unitLabel?: string;
+    }>();
 
   const displayUnitLabel = unitLabel ?? `Unit ${unitId}`;
 
@@ -97,15 +100,26 @@ export default function MoveInScreen() {
   const [sections, setSections] = useState<Section[]>(
     INITIAL_SECTIONS.map((s) => ({ ...s, photos: [] }))
   );
-  const [currentSectionKey, setCurrentSectionKey] = useState<SectionKey | null>(
-    null
-  );
+  const [currentSectionKey, setCurrentSectionKey] =
+    useState<SectionKey | null>(null);
   const [capturing, setCapturing] = useState(false);
-
   const [previewPhoto, setPreviewPhoto] = useState<{
     sectionKey: SectionKey;
     photoId: string;
   } | null>(null);
+
+  // ❗ Hooks that must always run, every render:
+  const currentSection: Section | undefined = useMemo(
+    () => sections.find((s) => s.key === currentSectionKey),
+    [sections, currentSectionKey]
+  );
+
+  const allSectionsComplete = useMemo(
+    () => sections.every((s) => s.photos.length >= s.minPhotos),
+    [sections]
+  );
+
+  // ✅ After all hooks, now we can early-return based on permission
 
   if (!permission) {
     return <View />;
@@ -121,16 +135,6 @@ export default function MoveInScreen() {
       </View>
     );
   }
-
-  const currentSection: Section | undefined = useMemo(
-    () => sections.find((s) => s.key === currentSectionKey),
-    [sections, currentSectionKey]
-  );
-
-  const allSectionsComplete = useMemo(
-    () => sections.every((s) => s.photos.length >= s.minPhotos),
-    [sections]
-  );
 
   // ---- Navigation helpers ----
 
@@ -163,11 +167,12 @@ export default function MoveInScreen() {
       });
 
       if (photo?.uri) {
-        // Save locally (for your gallery / debugging)
+        // Save locally (for gallery/debugging)
         addPhoto(photo.uri);
 
-        // Upload to Supabase
-        const { storagePath, publicUrl } = await uploadPhotoToSupabase(photo.uri);
+        const { storagePath, publicUrl } = await uploadPhotoToSupabase(
+          photo.uri
+        );
 
         const newPhoto: MoveInPhoto = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -292,10 +297,7 @@ export default function MoveInScreen() {
               Complete all sections with at least the minimum photos to finish.
             </Text>
           )}
-          <TouchableOpacity
-            className="mt-3"
-            onPress={() => router.back()}
-          >
+          <TouchableOpacity className="mt-3" onPress={() => router.back()}>
             <Text className="text-xs text-gray-400 text-center">
               Back to unit
             </Text>
@@ -471,7 +473,6 @@ export default function MoveInScreen() {
         <Button
           title="Done"
           onPress={() => {
-            // For now, go back to the unit screen.
             router.back();
           }}
         />
