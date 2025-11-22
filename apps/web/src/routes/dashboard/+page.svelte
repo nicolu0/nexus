@@ -176,7 +176,7 @@
 	>
 		<div class="flex items-center gap-1">
 			<img src={nexusLogo} alt="Nexus logo" class="h-6 w-6" />
-			<span class="text-lg font-semibold tracking-tight text-stone-700">Lattice</span>
+			<span class="text-lg font-semibold tracking-tight text-stone-700">Nexus</span>
 		</div>
 		<div class="flex items-center gap-4">
 			<button

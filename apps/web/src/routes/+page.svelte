@@ -90,7 +90,7 @@
 		<div class="container mx-auto flex items-center justify-between">
 			<div class="flex items-center gap-0.5">
 				<img src={nexusLogo} alt="Nexus logo" class="h-8 w-8" />
-				<span class="text-lg font-medium tracking-tight text-stone-700">Lattice</span>
+				<span class="text-lg font-medium tracking-tight text-stone-700">Nexus</span>
 			</div>
 			<div class="hidden items-center gap-8 text-sm font-medium text-stone-600 md:flex">
 				<a href="#features" class="transition-colors hover:text-stone-900">Features</a>
@@ -122,8 +122,8 @@
 		<div class="pointer-events-none absolute inset-0 z-10 mx-auto max-w-7xl">
 			<div class="pointer-events-auto relative h-full w-full">
 				<AlertPin top="22%" left="14%" delay={600} severity="high" message="Flood in Basement" />
-				<AlertPin top="32%" left="95%" delay={1600} severity="medium" message="Broken Toilet" />
-				<AlertPin top="58%" left="85%" delay={2600} severity="low" message="Photos Uploaded" />
+				<AlertPin top="32%" left="95%" delay={1000} severity="medium" message="Broken Toilet" />
+				<AlertPin top="58%" left="85%" delay={1400} severity="low" message="Photos Uploaded" />
 			</div>
 		</div>
 

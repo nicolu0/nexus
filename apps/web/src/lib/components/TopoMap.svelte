@@ -8,16 +8,13 @@
 	let el: HTMLDivElement;
 
 	onMount(() => {
-		// Scene
 		const scene = new THREE.Scene();
 		scene.fog = new THREE.Fog(0xffffff, 85, 300);
 
-		// Camera (fixed)
 		const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 600);
 		camera.position.set(0, 30, 78);
 		camera.lookAt(0, 0, 0);
 
-		// Renderer
 		const renderer = new THREE.WebGLRenderer({
 			alpha: true,
 			antialias: true,
@@ -26,13 +23,11 @@
 		renderer.setPixelRatio(window.devicePixelRatio);
 		el.appendChild(renderer.domElement);
 
-		// Plane
 		const size = 280;
 		const segs = 90;
 		const geo = new THREE.PlaneGeometry(size, size, segs, segs);
 		geo.rotateX(-Math.PI / 2);
 
-		// Invisible fill mesh
 		const meshMat = new THREE.MeshBasicMaterial({
 			transparent: true,
 			opacity: 0,
@@ -42,12 +37,11 @@
 		const plane = new THREE.Mesh(geo, meshMat);
 		scene.add(plane);
 
-		// Wireframe overlay
 		let wireGeo = new THREE.WireframeGeometry(geo);
 		const wireMat = new THREE.LineBasicMaterial({
 			color: 0xc8c7c4,
 			transparent: true,
-			opacity: 0.55,
+			opacity: 0,
 			depthTest: false,
 			depthWrite: false
 		});
@@ -55,18 +49,19 @@
 		wire.position.y = 0.02;
 		scene.add(wire);
 
-		// Noise params
 		const noise2D = createNoise2D();
-		let amp = 0;
-		const targetAmp = 3.8;
 
-		// Broad hills
+		const targetAmp = 3.8;
+		const targetWireOpacity = 0.55;
+
 		const freqA = 0.022;
 		const freqB = 0.006;
 
-		// Valley profile (independent of noise)
-		const valleyHeight = 25.0; // how high the left/right walls rise
-		const valleyCurvePow = 1.6; // 1.2–2.0 = smooth bowl, higher = steeper walls
+		const valleyHeight = 25.0;
+		const valleyCurvePow = 1.6;
+
+		let amp = 0;
+		let shapeT = 0;
 
 		function updateTerrain() {
 			const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -76,47 +71,70 @@
 				const x = pos.getX(i);
 				const z = pos.getZ(i);
 
-				// 0 at center -> 1 at left/right edges
 				const nx = Math.abs(x) / half;
 
-				// Smooth U-shaped bowl (cosine-based curve)
-				// edgeProfile: 0 center, 1 edge, with curved slope
 				const edgeProfile = Math.pow((1 - Math.cos(Math.PI * nx)) * 0.5, valleyCurvePow);
-				const bowl = edgeProfile * valleyHeight;
+				const bowl = edgeProfile * valleyHeight * shapeT;
 
-				// Terrain noise on top of bowl
 				const nA = noise2D(x * freqA, z * freqA);
 				const nB = noise2D(x * freqB, z * freqB);
-				const noise = (nA * 0.8 + nB * 0.2) * amp;
+				const noise = (nA * 0.8 + nB * 0.2) * amp * shapeT;
 
-				const y = bowl + noise;
-				pos.setY(i, y);
+				pos.setY(i, bowl + noise);
 			}
 
 			pos.needsUpdate = true;
 			geo.computeVertexNormals();
 
-			// sync wireframe
 			wire.geometry.dispose();
 			wireGeo.dispose();
 			wireGeo = new THREE.WireframeGeometry(geo);
 			wire.geometry = wireGeo;
 		}
-		// Rise once on load, then stay static
-		gsap.to(
-			{ a: 0 },
+
+		updateTerrain();
+
+		// Enter animation tuning
+		const enterDuration = 1; // longer, more gradual fade/rise
+		const terrainDuration = 1.4;
+		const overlapAt = enterDuration * 0.4; // start terrain ~70% into fade
+
+		const enterState = { y: -14, o: 0 };
+		plane.position.y = enterState.y;
+		wire.position.y = enterState.y + 0.02;
+
+		const tl = gsap.timeline();
+
+		// flat plane rises + fades in slowly
+		tl.to(enterState, {
+			y: 0,
+			o: targetWireOpacity,
+			duration: enterDuration,
+			ease: 'power2.inOut',
+			onUpdate: () => {
+				plane.position.y = enterState.y;
+				wire.position.y = enterState.y + 0.02;
+				wireMat.opacity = enterState.o;
+			}
+		});
+
+		// terrain begins before fade finishes (at ~70%)
+		const terrainState = { t: 0 };
+		tl.to(
+			terrainState,
 			{
-				a: targetAmp,
-				duration: 1.4,
+				t: 1,
+				duration: terrainDuration,
 				ease: 'power3.out',
-				onUpdate() {
-					amp = (this.targets() as any)[0].a;
+				onUpdate: () => {
+					shapeT = terrainState.t;
+					amp = targetAmp * terrainState.t;
 					updateTerrain();
 				}
-			}
+			},
+			overlapAt
 		);
 
-		// Resize
 		const resize = () => {
 			const { width, height } = el.getBoundingClientRect();
 			if (width === 0 || height === 0) return;
@@ -127,7 +145,6 @@
 		resize();
 		window.addEventListener('resize', resize);
 
-		// Render loop (no movement)
 		let raf = 0;
 		const animate = () => {
 			raf = requestAnimationFrame(animate);
@@ -135,7 +152,6 @@
 		};
 		animate();
 
-		// Cleanup
 		return () => {
 			cancelAnimationFrame(raf);
 			window.removeEventListener('resize', resize);
