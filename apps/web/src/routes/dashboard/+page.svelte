@@ -9,54 +9,22 @@
 		createPropertyOptimistic,
 		updatePropertyAt,
 		updateUnitStatus,
+		fetchUnitImages,
 		type UnitRecord,
-		type UnitStatus
+		type UnitStatus,
+		type UnitImageRecord
 	} from '$lib/stores/properties';
 	import nexusLogo from '$lib/assets/nexus.svg';
 
-	type DamageSeverity = 'Good' | 'Moderate' | 'Severe';
-
-	type Snapshot = {
-		severity: DamageSeverity;
-		timestamp: string;
-		hasPhoto?: boolean;
-	};
-
-	type SectionDetail = {
+	type UnitImageSection = {
 		name: string;
-		snapshots: Snapshot[];
+		snapshots: {
+			id: string;
+			url: string | null;
+			phase: 'before' | 'after';
+			created_at: string | null;
+		}[];
 	};
-
-	const detailSections: SectionDetail[] = [
-		{
-			name: 'Kitchen',
-			snapshots: [
-				{ severity: 'Severe', timestamp: 'Mar 2, 2024 • 2:15 PM', hasPhoto: true },
-				{ severity: 'Moderate', timestamp: 'Mar 5, 2024 • 8:05 AM', hasPhoto: false }
-			]
-		},
-		{
-			name: 'Bathroom',
-			snapshots: [
-				{ severity: 'Moderate', timestamp: 'Mar 1, 2024 • 4:18 PM' },
-				{ severity: 'Good', timestamp: 'Mar 6, 2024 • 10:02 AM' }
-			]
-		},
-		{
-			name: 'Living Room',
-			snapshots: [
-				{ severity: 'Severe', timestamp: 'Feb 27, 2024 • 5:44 PM' },
-				{ severity: 'Good', timestamp: 'Mar 4, 2024 • 12:31 PM' }
-			]
-		},
-		{
-			name: 'Bedroom 1',
-			snapshots: [
-				{ severity: 'Moderate', timestamp: 'Mar 3, 2024 • 9:20 AM' },
-				{ severity: 'Good', timestamp: 'Mar 6, 2024 • 6:50 PM' }
-			]
-		}
-	];
 
 	let selectedUnit: UnitRecord | null = $state(null);
 	let openStatusUnitId: string | null = $state(null);
@@ -67,6 +35,9 @@
 	let newPropertyUnits = $state(1);
 	let createPropertyLoading = $state(false);
 	let createPropertyError = $state('');
+	let unitImagesLoading = $state(false);
+	let unitImagesError = $state('');
+	let unitImageSections = $state<UnitImageSection[]>([]);
 
 	onMount(async () => {
 		await loadPropertiesFromSupabase();
@@ -99,10 +70,13 @@
 
 	function openSidePeek(unit: UnitRecord) {
 		selectedUnit = unit;
+		loadUnitImages(unit.id);
 	}
 
 	function closeSidePeek() {
 		selectedUnit = null;
+		unitImageSections = [];
+		unitImagesError = '';
 	}
 
 	function toggleStatusDropdown(unitId: string) {
@@ -118,12 +92,6 @@
 		if (status === 'In progress') return 'bg-blue-500/15 text-blue-700 border-blue-500/30';
 		if (status === 'Done') return 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30';
 		return 'bg-stone-500/15 text-stone-700 border-stone-500/30';
-	}
-
-	function damageTagClasses(severity: DamageSeverity) {
-		if (severity === 'Severe') return 'bg-rose-500/15 text-rose-700';
-		if (severity === 'Moderate') return 'bg-amber-500/15 text-amber-700';
-		return 'bg-emerald-500/15 text-emerald-700';
 	}
 
 	async function handleCreateProperty(event: SubmitEvent) {
@@ -162,6 +130,51 @@
 	function closeCreatePropertyModal() {
 		createPropertyError = '';
 		showCreatePropertyModal = false;
+	}
+
+	function buildSections(images: UnitImageRecord[]): UnitImageSection[] {
+		const map = new Map<string, UnitImageSection>();
+		images.forEach((image) => {
+			const existing = map.get(image.section) ?? { name: image.section, snapshots: [] };
+			existing.snapshots.push({
+				id: image.id,
+				url: image.url,
+				phase: image.phase,
+				created_at: image.created_at
+			});
+			map.set(image.section, existing);
+		});
+
+		return Array.from(map.values()).map((section) => ({
+			...section,
+			snapshots: section.snapshots.sort((a, b) => (a.phase > b.phase ? 1 : -1))
+		}));
+	}
+
+	async function loadUnitImages(unitId: string) {
+		unitImagesLoading = true;
+		unitImagesError = '';
+		unitImageSections = [];
+		try {
+			const images = await fetchUnitImages(unitId);
+			unitImageSections = buildSections(images);
+		} catch (err) {
+			unitImagesError = err instanceof Error ? err.message : 'Unable to load images.';
+		} finally {
+			unitImagesLoading = false;
+		}
+	}
+
+	function formatTimestamp(value: string | null) {
+		if (!value) return '—';
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) return '—';
+		return date.toLocaleString(undefined, {
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		});
 	}
 
 	async function logout() {
@@ -359,40 +372,46 @@
 					</button>
 				</div>
 				<div class="flex-1 space-y-6 overflow-y-auto pt-4 pr-2 pb-6 text-stone-700">
-					{#each detailSections as section}
-						<div class="space-y-4">
-							<p class="text-sm font-medium tracking-wide text-stone-500 uppercase">
-								{section.name}
-							</p>
-							<div class="grid grid-cols-2 gap-4">
-								{#each section.snapshots as snapshot}
-									{#if snapshot.hasPhoto !== false}
+					{#if unitImagesLoading}
+						<div class="rounded-lg border border-dashed border-stone-300 bg-white/70 px-4 py-6 text-center text-sm text-stone-500">
+							Loading photos...
+						</div>
+					{:else if unitImagesError}
+						<div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{unitImagesError}</div>
+					{:else if unitImageSections.length === 0}
+						<div class="rounded-lg border border-dashed border-stone-200 bg-white/70 px-4 py-6 text-center text-sm text-stone-500">
+							No photos for this unit yet.
+						</div>
+					{:else}
+						{#each unitImageSections as section}
+							<div class="space-y-4">
+								<p class="text-sm font-medium uppercase tracking-wide text-stone-500">{section.name}</p>
+								<div class="grid grid-cols-2 gap-4">
+									{#each section.snapshots as snapshot}
 										<div class="overflow-hidden rounded-lg border border-stone-200 bg-white">
-											<div class="h-50 bg-stone-300"></div>
-											<div
-												class="flex items-center justify-between bg-stone-100 px-3 py-2 text-xs font-medium text-stone-500"
-											>
+											{#if snapshot.url}
+												<img src={snapshot.url} alt={`${snapshot.phase} photo of ${section.name}`} class="h-50 w-full object-cover" />
+											{:else}
+												<div class="h-50 bg-stone-200"></div>
+											{/if}
+											<div class="flex items-center justify-between bg-stone-100 px-3 py-2 text-xs font-medium text-stone-500">
 												<span
-													class={`rounded-full px-2 py-0.5 text-xs font-semibold ${damageTagClasses(snapshot.severity)}`}
+													class={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+														snapshot.phase === 'before'
+															? 'bg-stone-500/15 text-stone-700'
+															: 'bg-emerald-500/15 text-emerald-700'
+													}`}
 												>
-													{snapshot.severity}
+													{snapshot.phase === 'before' ? 'Before' : 'After'}
 												</span>
-												<span class="text-[11px] text-stone-400">{snapshot.timestamp}</span>
+												<span class="text-[11px] text-stone-400">{formatTimestamp(snapshot.created_at)}</span>
 											</div>
 										</div>
-									{:else}
-										<button
-											type="button"
-											class="flex h-50 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dotted border-stone-300 bg-stone-50 text-xs font-semibold tracking-wide text-stone-400 uppercase hover:border-stone-400 hover:text-stone-500"
-										>
-											<span class="text-base">＋</span>
-											Add photo
-										</button>
-									{/if}
-								{/each}
+									{/each}
+								</div>
 							</div>
-						</div>
-					{/each}
+						{/each}
+					{/if}
 				</div>
 			</aside>
 		{/if}

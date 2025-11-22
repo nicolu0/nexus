@@ -9,6 +9,18 @@ export type UnitRecord = {
 	status: UnitStatus;
 };
 
+export type UnitImageRecord = {
+	id: string;
+	section: string;
+	phase: 'before' | 'after';
+	bucket: string;
+	path: string;
+	mime_type: string | null;
+	sort_order: number;
+	created_at: string | null;
+	url: string | null;
+};
+
 export type PropertyRecord = {
 	id: string;
 	name: string;
@@ -188,4 +200,33 @@ export function updateUnitStatus(propertyIndex: number, unitIndex: number, statu
 		...property,
 		units: property.units.map((unit, idx) => (idx === unitIndex ? { ...unit, status } : unit))
 	}));
+}
+
+export async function fetchUnitImages(unitId: string): Promise<UnitImageRecord[]> {
+	const { data, error } = await supabase
+		.from('images')
+		.select('id, section_name, phase, bucket, path, mime_type, sort_order, created_at')
+		.eq('unit_id', unitId)
+		.order('section_name', { ascending: true })
+		.order('phase', { ascending: true })
+		.order('sort_order', { ascending: true });
+
+	if (error) {
+		throw error;
+	}
+
+	return (data ?? []).map((row) => {
+		const publicUrl = supabase.storage.from(row.bucket).getPublicUrl(row.path).data?.publicUrl ?? null;
+		return {
+			id: row.id,
+			section: row.section_name,
+			phase: row.phase as 'before' | 'after',
+			bucket: row.bucket,
+			path: row.path,
+			mime_type: row.mime_type,
+			sort_order: row.sort_order,
+			created_at: row.created_at,
+			url: publicUrl
+		};
+	});
 }

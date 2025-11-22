@@ -167,4 +167,4 @@
 	});
 </script>
 
-<div bind:this={el} class="pointer-events-none absolute inset-0 z-0" aria-hidden="true" />
+<div bind:this={el} class="pointer-events-none absolute inset-0 z-0" aria-hidden="true"></div>

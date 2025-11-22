@@ -116,7 +116,7 @@
 			class="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-64
          bg-gradient-to-b from-transparent via-stone-50/40 to-stone-50"
 			aria-hidden="true"
-		/>
+		></div>
 
 		<!-- pins overlay -->
 		<div class="pointer-events-none absolute inset-0 z-10 mx-auto max-w-7xl">

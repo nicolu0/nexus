@@ -79,7 +79,7 @@
 					opacity: ${lerp(0.35, 0.65, depthT)};
 				`}
 				in:fade={{ duration: 260, easing: (t) => t * t * (3 - 2 * t) }}
-			/>
+			></div>
 		{/if}
 
 		<img
@@ -112,8 +112,8 @@
 				<div
 					class={`absolute inset-0 rounded-full ${dotColor} origin-center scale-75 animate-ping opacity-40`}
 					style="animation-duration: 1.6s;"
-				/>
-				<div class={`h-2 w-2 rounded-full ${dotColor}`} />
+				></div>
+				<div class={`h-2 w-2 rounded-full ${dotColor}`}></div>
 			</div>
 			<div class="text-[10px] font-medium tracking-tight text-stone-900">
 				{message}
