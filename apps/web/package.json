@@ -41,6 +41,9 @@
 		"vite": "^7.1.10"
 	},
 	"dependencies": {
-		"@supabase/supabase-js": "^2.84.0"
+		"@supabase/supabase-js": "^2.84.0",
+		"gsap": "^3.13.0",
+		"simplex-noise": "^4.0.3",
+		"three": "^0.181.2"
 	}
 }

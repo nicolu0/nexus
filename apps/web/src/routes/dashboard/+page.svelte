@@ -1,15 +1,17 @@
 <script lang="ts">
-	import { fly } from 'svelte/transition';
-	import { onMount } from 'svelte';
-	import {
-		propertiesStore,
-		fetchProperties,
-		createPropertyOptimistic,
-		updatePropertyAt,
-		updateUnitStatus,
-		type UnitRecord,
-		type UnitStatus
-	} from '$lib/stores/properties';
+import { fly } from 'svelte/transition';
+import { onMount } from 'svelte';
+import { goto } from '$app/navigation';
+import supabase from '$lib/supabaseClient';
+import {
+	propertiesStore,
+	fetchProperties,
+	createPropertyOptimistic,
+	updatePropertyAt,
+	updateUnitStatus,
+	type UnitRecord,
+	type UnitStatus
+} from '$lib/stores/properties';
 	import nexusLogo from '$lib/assets/nexus.svg';
 
 	type DamageSeverity = 'Good' | 'Moderate' | 'Severe';
@@ -157,10 +159,15 @@
 		createPropertyError = '';
 	}
 
-	function closeCreatePropertyModal() {
-		createPropertyError = '';
-		showCreatePropertyModal = false;
-	}
+function closeCreatePropertyModal() {
+	createPropertyError = '';
+	showCreatePropertyModal = false;
+}
+
+async function logout() {
+	await supabase.auth.signOut();
+	await goto('/');
+}
 </script>
 
 <div class="flex min-h-screen w-full flex-col bg-stone-50 font-sans">
@@ -174,7 +181,9 @@
 		<div class="flex items-center gap-4">
 			<button
 				type="button"
+				onclick={logout}
 				class="flex items-center rounded-full bg-stone-200 p-2 transition hover:border-stone-300"
+				aria-label="Sign out"
 			>
 				<span class="font-mono tracking-tighter text-stone-500">
 					<svg
