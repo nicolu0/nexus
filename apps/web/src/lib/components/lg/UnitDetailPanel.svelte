@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
 	import PhotoTriplet from '$lib/components/sm/PhotoTriplet.svelte';
-	import type { Building, Section } from '$lib/types/dashboard';
+	import type { Property, Section } from '$lib/types/dashboard';
 
 	const noop = () => {};
 
 	let {
 		selectedUnit = null,
-		selectedBuilding = null,
+		selectedProperty = null,
 		sections = [],
 		onClose = noop
 	} = $props<{
 		selectedUnit?: string | null;
-		selectedBuilding?: Building | null;
+		selectedProperty?: Property | null;
 		sections?: Section[];
 		onClose?: () => void;
 	}>();
@@ -33,7 +33,7 @@
 			<button class="text-xs text-stone-400 hover:text-stone-900" onclick={handleClose}>
 				>>
 			</button>
-			{selectedUnit}/{selectedBuilding ? shortAddr(selectedBuilding.address) : ''}
+			{selectedUnit}/{selectedProperty ? shortAddr(selectedProperty.address) : ''}
 		</div>
 
 		<div class="mt-6 flex flex-col gap-8">

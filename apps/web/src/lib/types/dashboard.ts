@@ -10,7 +10,7 @@ export type Section = {
 	photos: Triplet | null;
 };
 
-export type Building = {
+export type Property = {
 	id: string;
 	address: string;
 	units: string[];
