@@ -16,16 +16,19 @@ import { supabase } from '../lib/supabase';
 import { usePhotos } from '../context/PhotoContext';
 
 async function uploadPhotoToSupabase(uri: string) {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-
     const ext = 'jpg';
     const filename = `${Date.now()}.${ext}`;
     const path = `raw/${filename}`;
 
+    const file = {
+        uri,
+        name: filename,
+        type: 'image/jpeg',
+    } as any;
+
     const { error } = await supabase.storage
-        .from('Images')
-        .upload(path, blob, {
+        .from('unit-images')
+        .upload(path, file, {
             contentType: 'image/jpeg',
             upsert: false,
         });
@@ -36,7 +39,7 @@ async function uploadPhotoToSupabase(uri: string) {
     }
 
     const { data: publicData } = supabase.storage
-        .from('Images')
+        .from('unit-images')
         .getPublicUrl(path);
 
     return {
@@ -51,13 +54,25 @@ export default function CameraScreen() {
     const [capturing, setCapturing] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showPropertyMenu, setShowPropertyMenu] = useState(false);
+    const [showUnitMenu, setShowUnitMenu] = useState(false);
     const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+    const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
     const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string } | null>(null);
+    const [selectedUnit, setSelectedUnit] = useState<{ id: string; unit_number: string } | null>(null);
     const { photos, addPhoto } = usePhotos();
 
     React.useEffect(() => {
         fetchProperties();
     }, []);
+
+    React.useEffect(() => {
+        if (selectedProperty) {
+            fetchUnits(selectedProperty.id);
+        } else {
+            setUnits([]);
+            setSelectedUnit(null);
+        }
+    }, [selectedProperty]);
 
     async function fetchProperties() {
         try {
@@ -83,6 +98,27 @@ export default function CameraScreen() {
         }
     }
 
+    async function fetchUnits(propertyId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('units')
+                .select('id, unit_number')
+                .eq('property_id', propertyId)
+                .order('unit_number');
+
+            if (error) throw error;
+
+            if (data) {
+                setUnits(data);
+                // Optional: Select first unit automatically? User didn't specify, but it's often good UX.
+                // Leaving it null for now to force explicit selection unless requested otherwise.
+                setSelectedUnit(null);
+            }
+        } catch (e) {
+            console.error('Error fetching units:', e);
+        }
+    }
+
     if (!permission) {
         return <View className="flex-1 bg-black" />;
     }
@@ -101,6 +137,11 @@ export default function CameraScreen() {
     async function takePicture() {
         if (!cameraRef.current || capturing) return;
 
+        if (!selectedUnit) {
+            Alert.alert('Select Unit', 'Please select a unit before taking a photo.');
+            return;
+        }
+
         setCapturing(true);
         try {
             const photo = await cameraRef.current.takePictureAsync({
@@ -117,6 +158,29 @@ export default function CameraScreen() {
                     photo.uri
                 );
                 console.log('Uploaded to Supabase:', storagePath, publicUrl);
+
+                // Store metadata in public.images
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { error: dbError } = await supabase
+                        .from('images')
+                        .insert({
+                            unit_id: selectedUnit.id,
+                            created_by: user.id,
+                            path: storagePath,
+                            bucket: 'unit-images',
+                            section_name: 'General',
+                            taken_at: new Date().toISOString(),
+                            mime_type: 'image/jpeg',
+                        });
+
+                    if (dbError) {
+                        console.error('Error saving image metadata:', dbError);
+                        Alert.alert('Error', 'Failed to save image metadata');
+                    } else {
+                        console.log('Image metadata saved to database');
+                    }
+                }
             }
         } catch (e) {
             console.error('takePicture error:', e);
@@ -140,22 +204,27 @@ export default function CameraScreen() {
             {/* Top Controls */}
             <SafeAreaView className="absolute top-0 left-0 right-0 z-10" pointerEvents="box-none">
                 <View className="flex-row justify-between px-4 pt-2" pointerEvents="box-none">
-                    {/* Property Selector (Center) */}
-                    <View className="flex-1 items-center z-30" pointerEvents="box-none">
+                    {/* Selectors Container (Center) */}
+                    <View className="flex-1 flex-row justify-center items-start gap-2 z-30" pointerEvents="box-none">
+                        {/* Property Selector */}
                         <View className="relative">
                             <TouchableOpacity
-                                onPress={() => setShowPropertyMenu(!showPropertyMenu)}
+                                onPress={() => {
+                                    setShowPropertyMenu(!showPropertyMenu);
+                                    setShowUnitMenu(false);
+                                    setShowMenu(false);
+                                }}
                                 className="flex-row items-center bg-black/40 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
                             >
-                                <Text className="text-white font-medium mr-1">
+                                <Text className="text-white font-medium mr-1 max-w-[120px]" numberOfLines={1}>
                                     {selectedProperty?.name || 'Select Property'}
                                 </Text>
                                 <Ionicons name="chevron-down" size={16} color="white" />
                             </TouchableOpacity>
 
                             {showPropertyMenu && (
-                                <View className="absolute top-full mt-2 left-0 right-0 items-center z-40">
-                                    <View className="bg-black/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-48 max-h-60">
+                                <View className="absolute top-full mt-2 left-0 w-full z-40">
+                                    <View className="bg-black/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
                                         <ScrollView nestedScrollEnabled>
                                             {properties.map((prop) => (
                                                 <TouchableOpacity
@@ -166,7 +235,10 @@ export default function CameraScreen() {
                                                     }}
                                                     className="px-4 py-3 border-b border-white/10 last:border-0"
                                                 >
-                                                    <Text className={`text-base ${selectedProperty?.id === prop.id ? 'font-bold text-white' : 'text-gray-300'}`}>
+                                                    <Text
+                                                        numberOfLines={1}
+                                                        className={`text-base ${selectedProperty?.id === prop.id ? 'font-bold text-white' : 'text-gray-300'}`}
+                                                    >
                                                         {prop.name}
                                                     </Text>
                                                 </TouchableOpacity>
@@ -181,12 +253,67 @@ export default function CameraScreen() {
                                 </View>
                             )}
                         </View>
+
+                        {/* Unit Selector */}
+                        <View className="relative">
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (selectedProperty) {
+                                        setShowUnitMenu(!showUnitMenu);
+                                        setShowPropertyMenu(false);
+                                        setShowMenu(false);
+                                    }
+                                }}
+                                disabled={!selectedProperty}
+                                className={`flex-row items-center bg-black/40 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
+                            >
+                                <Text className="text-white font-medium mr-1 max-w-[80px]" numberOfLines={1}>
+                                    {selectedUnit?.unit_number || 'Unit'}
+                                </Text>
+                                <Ionicons name="chevron-down" size={16} color="white" />
+                            </TouchableOpacity>
+
+                            {showUnitMenu && (
+                                <View className="absolute top-full mt-2 left-0 w-full z-40">
+                                    <View className="bg-black/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
+                                        <ScrollView nestedScrollEnabled>
+                                            {units.map((unit) => (
+                                                <TouchableOpacity
+                                                    key={unit.id}
+                                                    onPress={() => {
+                                                        setSelectedUnit(unit);
+                                                        setShowUnitMenu(false);
+                                                    }}
+                                                    className="px-4 py-3 border-b border-white/10 last:border-0"
+                                                >
+                                                    <Text
+                                                        numberOfLines={1}
+                                                        className={`text-base ${selectedUnit?.id === unit.id ? 'font-bold text-white' : 'text-gray-300'}`}
+                                                    >
+                                                        {unit.unit_number}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                            {units.length === 0 && (
+                                                <View className="px-4 py-3">
+                                                    <Text className="text-gray-400 text-center">No units</Text>
+                                                </View>
+                                            )}
+                                        </ScrollView>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
                     </View>
 
                     {/* Profile Menu (Right) */}
                     <View className="absolute right-4 top-2 z-20">
                         <TouchableOpacity
-                            onPress={() => setShowMenu(!showMenu)}
+                            onPress={() => {
+                                setShowMenu(!showMenu);
+                                setShowPropertyMenu(false);
+                                setShowUnitMenu(false);
+                            }}
                             className="w-10 h-10 bg-black/40 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
                         >
                             <Ionicons name="person-circle-outline" size={28} color="white" />
