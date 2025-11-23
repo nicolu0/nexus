@@ -154,28 +154,30 @@ export default function CameraScreen() {
                             </TouchableOpacity>
 
                             {showPropertyMenu && (
-                                <View className="absolute top-12 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-lg py-2 w-48 max-h-60 z-40">
-                                    <ScrollView nestedScrollEnabled>
-                                        {properties.map((prop) => (
-                                            <TouchableOpacity
-                                                key={prop.id}
-                                                onPress={() => {
-                                                    setSelectedProperty(prop);
-                                                    setShowPropertyMenu(false);
-                                                }}
-                                                className="px-4 py-3 border-b border-gray-100 last:border-0"
-                                            >
-                                                <Text className={`text-base ${selectedProperty?.id === prop.id ? 'font-bold text-black' : 'text-gray-700'}`}>
-                                                    {prop.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                        {properties.length === 0 && (
-                                            <View className="px-4 py-3">
-                                                <Text className="text-gray-500 text-center">No properties found</Text>
-                                            </View>
-                                        )}
-                                    </ScrollView>
+                                <View className="absolute top-full mt-2 left-0 right-0 items-center z-40">
+                                    <View className="bg-black/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-48 max-h-60">
+                                        <ScrollView nestedScrollEnabled>
+                                            {properties.map((prop) => (
+                                                <TouchableOpacity
+                                                    key={prop.id}
+                                                    onPress={() => {
+                                                        setSelectedProperty(prop);
+                                                        setShowPropertyMenu(false);
+                                                    }}
+                                                    className="px-4 py-3 border-b border-white/10 last:border-0"
+                                                >
+                                                    <Text className={`text-base ${selectedProperty?.id === prop.id ? 'font-bold text-white' : 'text-gray-300'}`}>
+                                                        {prop.name}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                            {properties.length === 0 && (
+                                                <View className="px-4 py-3">
+                                                    <Text className="text-gray-400 text-center">No properties found</Text>
+                                                </View>
+                                            )}
+                                        </ScrollView>
+                                    </View>
                                 </View>
                             )}
                         </View>
