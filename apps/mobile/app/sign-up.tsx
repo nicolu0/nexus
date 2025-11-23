@@ -7,17 +7,16 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 
-export default function AuthScreen() {
+export default function SignUpScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    async function handleSignIn() {
+    async function handleSignUp() {
         if (!email || !password) {
             Alert.alert('Missing info', 'Please enter email and password.');
             return;
@@ -25,15 +24,21 @@ export default function AuthScreen() {
 
         try {
             setLoading(true);
-            const { error } = await supabase.auth.signInWithPassword({
+            const { error } = await supabase.auth.signUp({
                 email,
                 password,
             });
             if (error) {
-                Alert.alert('Sign in error', error.message);
+                Alert.alert('Sign up error', error.message);
+            } else {
+                Alert.alert(
+                    'Check your email',
+                    'We sent you a confirmation link. After confirming, you can sign in.',
+                    [{ text: 'OK', onPress: () => router.back() }]
+                );
             }
         } catch (e: any) {
-            Alert.alert('Sign in error', e.message ?? 'Something went wrong');
+            Alert.alert('Sign up error', e.message ?? 'Something went wrong');
         } finally {
             setLoading(false);
         }
@@ -42,17 +47,9 @@ export default function AuthScreen() {
     return (
         <View className="flex-1 bg-stone-50 px-6">
             <View className="flex-1 justify-center">
-                <View className="items-center mb-8">
-                    <Image
-                        source={require('../assets/images/nexus.svg')}
-                        style={{ width: 60, height: 60 }}
-                        contentFit="contain"
-                    />
-                    <Text className="text-black text-3xl font-semibold mb-4">Nexus</Text>
-                </View>
-
-                <Text className="text-gray-600 mb-8 text-center">
-                    Sign in to start capturing AB 2801-compliant photos.
+                <Text className="text-black text-3xl font-semibold mb-8 text-center">Create Account</Text>
+                <Text className="text-gray-600 mb-6 text-center">
+                    Sign up to start capturing AB 2801-compliant photos.
                 </Text>
 
                 <View className="mb-4">
@@ -82,21 +79,21 @@ export default function AuthScreen() {
 
                 <TouchableOpacity
                     disabled={loading}
-                    onPress={handleSignIn}
-                    className="bg-stone-700 rounded-xl py-3 items-center mb-6"
+                    onPress={handleSignUp}
+                    className="bg-stone-700 rounded-xl py-3 items-center mb-3"
                 >
                     {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text className="text-white font-semibold">Sign In</Text>
+                        <Text className="text-white font-semibold">Sign Up</Text>
                     )}
                 </TouchableOpacity>
             </View>
 
             <View className="flex-row justify-center mb-10">
-                <Text className="text-gray-500">Don't have an account? </Text>
-                <TouchableOpacity onPress={() => router.push('/sign-up')}>
-                    <Text className="text-stone-700 font-semibold">Sign up</Text>
+                <Text className="text-gray-500">Already have an account? </Text>
+                <TouchableOpacity onPress={() => router.back()}>
+                    <Text className="text-stone-700 font-semibold">Sign in</Text>
                 </TouchableOpacity>
             </View>
         </View>
