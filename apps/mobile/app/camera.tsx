@@ -16,16 +16,19 @@ import { supabase } from '../lib/supabase';
 import { usePhotos } from '../context/PhotoContext';
 
 async function uploadPhotoToSupabase(uri: string) {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-
     const ext = 'jpg';
     const filename = `${Date.now()}.${ext}`;
     const path = `raw/${filename}`;
 
+    const file = {
+        uri,
+        name: filename,
+        type: 'image/jpeg',
+    } as any;
+
     const { error } = await supabase.storage
-        .from('Images')
-        .upload(path, blob, {
+        .from('unit-images')
+        .upload(path, file, {
             contentType: 'image/jpeg',
             upsert: false,
         });
@@ -36,7 +39,7 @@ async function uploadPhotoToSupabase(uri: string) {
     }
 
     const { data: publicData } = supabase.storage
-        .from('Images')
+        .from('unit-images')
         .getPublicUrl(path);
 
     return {
@@ -134,6 +137,11 @@ export default function CameraScreen() {
     async function takePicture() {
         if (!cameraRef.current || capturing) return;
 
+        if (!selectedUnit) {
+            Alert.alert('Select Unit', 'Please select a unit before taking a photo.');
+            return;
+        }
+
         setCapturing(true);
         try {
             const photo = await cameraRef.current.takePictureAsync({
@@ -150,6 +158,29 @@ export default function CameraScreen() {
                     photo.uri
                 );
                 console.log('Uploaded to Supabase:', storagePath, publicUrl);
+
+                // Store metadata in public.images
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { error: dbError } = await supabase
+                        .from('images')
+                        .insert({
+                            unit_id: selectedUnit.id,
+                            created_by: user.id,
+                            path: storagePath,
+                            bucket: 'unit-images',
+                            section_name: 'General',
+                            taken_at: new Date().toISOString(),
+                            mime_type: 'image/jpeg',
+                        });
+
+                    if (dbError) {
+                        console.error('Error saving image metadata:', dbError);
+                        Alert.alert('Error', 'Failed to save image metadata');
+                    } else {
+                        console.log('Image metadata saved to database');
+                    }
+                }
             }
         } catch (e) {
             console.error('takePicture error:', e);
