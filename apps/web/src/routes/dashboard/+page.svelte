@@ -3,7 +3,7 @@
 	import Header from '$lib/components/md/Header.svelte';
 	import PropertyToolbar from '$lib/components/md/PropertyToolbar.svelte';
 	import UnitDetailPanel from '$lib/components/lg/UnitDetailPanel.svelte';
-	import type { Property, Section } from '$lib/types/dashboard';
+	import type { Property, PropertyStatusFilter, Section } from '$lib/types/dashboard';
 	import supabase from '$lib/supabaseClient';
 	import { onMount } from 'svelte';
 
@@ -11,7 +11,11 @@
 	let selectedProperty = $state<Property | null>(null);
 
 	let properties = $state<Property[]>([]);
+	let filteredProperties = $state<Property[]>([]);
 	let isLoading = $state(true);
+	let propertyQuery = $state('');
+	let unitQuery = $state('');
+	let statusFilter = $state<PropertyStatusFilter>('all');
 
 	const createPropertyForm = () => ({
 		name: '',
@@ -98,6 +102,28 @@
 
 	onMount(() => {
 		void loadProperties();
+	});
+
+	$effect(() => {
+		const propertyTerm = propertyQuery.trim().toLowerCase();
+		const unitTerm = unitQuery.trim().toLowerCase();
+		const filter = statusFilter;
+
+		filteredProperties = properties.filter((property) => {
+			const addressText = (property.address ?? '').toLowerCase();
+			const propertyMatches =
+				propertyTerm.length === 0 || addressText.includes(propertyTerm);
+			const unitMatches =
+				unitTerm.length === 0 ||
+				property.units.some((unit) => unit.toLowerCase().includes(unitTerm));
+			const statusMatches =
+				filter === 'all'
+					? true
+					: filter === 'withUnits'
+						? property.units.length > 0
+						: property.units.length === 0;
+			return propertyMatches && unitMatches && statusMatches;
+		});
 	});
 
 	const openPropertyModal = () => {
@@ -255,10 +281,24 @@
 
 	<div class="relative flex min-h-0 flex-1 flex-row overflow-hidden">
 		<div class="flex min-h-0 w-full flex-col gap-4 overflow-y-auto px-10 py-6">
-			<PropertyToolbar onAddProperty={openPropertyModal} />
+			<PropertyToolbar
+				propertyQuery={propertyQuery}
+				unitQuery={unitQuery}
+				statusFilter={statusFilter}
+				onPropertyQueryChange={(value) => {
+					propertyQuery = value;
+				}}
+				onUnitQueryChange={(value) => {
+					unitQuery = value;
+				}}
+				onStatusChange={(value) => {
+					statusFilter = value;
+				}}
+				onAddProperty={openPropertyModal}
+			/>
 
 			<PropertyList
-				{properties}
+				properties={filteredProperties}
 				{isLoading}
 				onAddUnit={openUnitModal}
 				onSelectUnit={(property, unit) => {
