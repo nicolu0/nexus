@@ -1,6 +1,6 @@
 <script lang="ts">
-	import AlertPin from '$lib/components/AlertPin.svelte';
-	import TopoMap from '$lib/components/TopoMap.svelte';
+	import AlertPin from '$lib/components/landing/AlertPin.svelte';
+	import TopoMap from '$lib/components/landing/TopoMap.svelte';
 	import nexusLogo from '$lib/assets/nexus.svg';
 	import { scale, fade } from 'svelte/transition';
 	import { goto } from '$app/navigation';

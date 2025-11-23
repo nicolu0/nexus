@@ -25,7 +25,7 @@ npm run dev
 npm run dev -- --open
 ```
 
-## Building
+## Property
 
 To create a production version of your app:
 
