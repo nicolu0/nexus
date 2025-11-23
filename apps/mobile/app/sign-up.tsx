@@ -85,12 +85,12 @@ export default function SignUpScreen() {
                     {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text className="text-white font-semibold">Sign Up</Text>
+                        <Text className="text-white font-semibold">Sign up</Text>
                     )}
                 </TouchableOpacity>
             </View>
 
-            <View className="flex-row justify-center mb-10">
+            <View className="flex-row justify-center mb-12">
                 <Text className="text-gray-500">Already have an account? </Text>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Text className="text-stone-700 font-semibold">Sign in</Text>

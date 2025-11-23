@@ -88,12 +88,12 @@ export default function AuthScreen() {
                     {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text className="text-white font-semibold">Sign In</Text>
+                        <Text className="text-white font-semibold">Sign in</Text>
                     )}
                 </TouchableOpacity>
             </View>
 
-            <View className="flex-row justify-center mb-10">
+            <View className="flex-row justify-center mb-12">
                 <Text className="text-gray-500">Don't have an account? </Text>
                 <TouchableOpacity onPress={() => router.push('/sign-up')}>
                     <Text className="text-stone-700 font-semibold">Sign up</Text>
