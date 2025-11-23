@@ -1,72 +1,65 @@
-// apps/mobile/app/_layout.tsx
 import '../global.css';
-import { Stack } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { View } from 'react-native';
-import * as SplashScreenModule from 'expo-splash-screen';
-import SplashScreen from '../components/SplashScreen';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { Stack, useRouter, Href } from 'expo-router';
+import { Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import { PhotoProvider } from '../context/PhotoContext';
 
-SplashScreenModule.preventAutoHideAsync();
-
 export default function RootLayout() {
-    const [isAppReady, setIsAppReady] = useState(false);
-    const [isSplashAnimationFinished, setIsSplashAnimationFinished] =
-        useState(false);
+    const [session, setSession] = useState<Session | null | undefined>(undefined);
+    const router = useRouter();
 
+    // Watch Supabase auth state
     useEffect(() => {
-        async function prepare() {
-            try {
-                await SplashScreenModule.hideAsync();
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-            } catch (e) {
-                console.warn(e);
-            } finally {
-                setIsAppReady(true);
-            }
-        }
+        let mounted = true;
 
-        prepare();
+        // Initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!mounted) return;
+            setSession(session ?? null);
+        });
+
+        // Subscribe to changes
+        const { data: subscription } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                if (!mounted) return;
+                setSession(session ?? null);
+            }
+        );
+
+        return () => {
+            mounted = false;
+            subscription.subscription?.unsubscribe();
+        };
     }, []);
 
-    const stack = (
-        <PhotoProvider>
-            <Stack>
-                {/* Dashboard */}
-                <Stack.Screen
-                    name="index"
-                    options={{ title: 'Dashboard' }}
-                />
-                {/* Property detail + units */}
-                <Stack.Screen
-                    name="properties/[propertyId]/index"
-                    options={{ title: 'Property' }}
-                />
-                {/* Unit page */}
-                <Stack.Screen
-                    name="properties/[propertyId]/units/[unitId]/index"
-                    options={{ title: 'Unit' }}
-                />
-                {/* Move-in camera flow (full-screen, no header) */}
-                <Stack.Screen
-                    name="properties/[propertyId]/units/[unitId]/move-in"
-                    options={{ title: 'Move-in Photos', headerShown: false }}
-                />
-            </Stack>
-        </PhotoProvider>
-    );
+    // Redirect when auth state is known
+    useEffect(() => {
+        if (session === undefined) return; // still loading
 
-    if (isSplashAnimationFinished) {
-        return stack;
+        if (session) {
+            router.replace('/camera' as Href);
+        } else {
+            router.replace('/auth' as Href);
+        }
+    }, [session, router]);
+
+    // Simple loading screen while we check auth
+    if (session === undefined) {
+        return (
+            <View className="flex-1 justify-center items-center bg-black">
+                <ActivityIndicator />
+            </View>
+        );
     }
 
     return (
-        <View className="flex-1">
-            {stack}
-            <SplashScreen
-                isAppReady={isAppReady}
-                onAnimationFinish={() => setIsSplashAnimationFinished(true)}
-            />
-        </View>
+        <PhotoProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="camera" />
+                <Stack.Screen name="auth" />
+            </Stack>
+        </PhotoProvider>
     );
 }
