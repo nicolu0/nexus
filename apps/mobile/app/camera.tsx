@@ -50,7 +50,38 @@ export default function CameraScreen() {
     const cameraRef = useRef<CameraView>(null);
     const [capturing, setCapturing] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
+    const [showPropertyMenu, setShowPropertyMenu] = useState(false);
+    const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+    const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string } | null>(null);
     const { photos, addPhoto } = usePhotos();
+
+    React.useEffect(() => {
+        fetchProperties();
+    }, []);
+
+    async function fetchProperties() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('properties')
+                .select('id, name')
+                .eq('user_id', user.id)
+                .order('name');
+
+            if (error) throw error;
+
+            if (data) {
+                setProperties(data);
+                if (data.length > 0) {
+                    setSelectedProperty(data[0]);
+                }
+            }
+        } catch (e) {
+            console.error('Error fetching properties:', e);
+        }
+    }
 
     if (!permission) {
         return <View className="flex-1 bg-black" />;
@@ -108,17 +139,59 @@ export default function CameraScreen() {
 
             {/* Top Controls */}
             <SafeAreaView className="absolute top-0 left-0 right-0 z-10" pointerEvents="box-none">
-                <View className="flex-row justify-end px-4 pt-2" pointerEvents="box-none">
-                    <View className="relative">
+                <View className="flex-row justify-between px-4 pt-2" pointerEvents="box-none">
+                    {/* Property Selector (Center) */}
+                    <View className="flex-1 items-center z-30" pointerEvents="box-none">
+                        <View className="relative">
+                            <TouchableOpacity
+                                onPress={() => setShowPropertyMenu(!showPropertyMenu)}
+                                className="flex-row items-center bg-black/40 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
+                            >
+                                <Text className="text-white font-medium mr-1">
+                                    {selectedProperty?.name || 'Select Property'}
+                                </Text>
+                                <Ionicons name="chevron-down" size={16} color="white" />
+                            </TouchableOpacity>
+
+                            {showPropertyMenu && (
+                                <View className="absolute top-12 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-lg py-2 w-48 max-h-60 z-40">
+                                    <ScrollView nestedScrollEnabled>
+                                        {properties.map((prop) => (
+                                            <TouchableOpacity
+                                                key={prop.id}
+                                                onPress={() => {
+                                                    setSelectedProperty(prop);
+                                                    setShowPropertyMenu(false);
+                                                }}
+                                                className="px-4 py-3 border-b border-gray-100 last:border-0"
+                                            >
+                                                <Text className={`text-base ${selectedProperty?.id === prop.id ? 'font-bold text-black' : 'text-gray-700'}`}>
+                                                    {prop.name}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                        {properties.length === 0 && (
+                                            <View className="px-4 py-3">
+                                                <Text className="text-gray-500 text-center">No properties found</Text>
+                                            </View>
+                                        )}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* Profile Menu (Right) */}
+                    <View className="absolute right-4 top-2 z-20">
                         <TouchableOpacity
                             onPress={() => setShowMenu(!showMenu)}
-                            className="w-10 h-10 bg-black/40 rounded-full justify-center items-center backdrop-blur-md"
+                            className="w-10 h-10 bg-black/40 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
                         >
                             <Ionicons name="person-circle-outline" size={28} color="white" />
                         </TouchableOpacity>
 
                         {showMenu && (
-                            <View className="absolute top-12 right-0 bg-white rounded-xl shadow-lg py-2 w-32 z-20">
+                            <View className="absolute top-12 right-0 bg-white rounded-xl shadow-lg py-2 w-32">
                                 <TouchableOpacity
                                     onPress={handleSignOut}
                                     className="px-4 py-2 flex-row items-center"
