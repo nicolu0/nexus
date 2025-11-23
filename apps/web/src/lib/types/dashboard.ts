@@ -15,3 +15,5 @@ export type Property = {
 	address: string;
 	units: string[];
 };
+
+export type PropertyStatusFilter = 'all' | 'withUnits' | 'withoutUnits';
