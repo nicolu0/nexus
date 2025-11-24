@@ -12,8 +12,8 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../lib/supabase';
-import { usePhotos } from '../context/PhotoContext';
+import { supabase } from '../../lib/supabase';
+import { usePhotos } from '../../context/PhotoContext';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -334,39 +334,19 @@ export default function CameraScreen() {
                 </View>
             </SafeAreaView>
 
-            {/* Bottom Controls Overlay */}
-            <View className="absolute bottom-0 left-0 right-0" pointerEvents="box-none">
-                {/* Capture Button */}
-                <View className="items-center mb-16" pointerEvents="box-none">
-                    <TouchableOpacity
-                        disabled={capturing}
-                        onPress={takePicture}
-                        className={
-                            capturing
-                                ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
-                                : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
-                        }
-                    >
-                        <View className="w-[67px] h-[67px] rounded-full bg-white" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Bottom Menu Bar */}
-                <View className="bg-neutral-800 w-full">
-                    <SafeAreaView edges={['bottom']} className="flex-row justify-around items-center pt-3 pb-2">
-                        <TouchableOpacity className="items-center p-2">
-                            <Ionicons name="grid-outline" size={24} color="white" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity className="items-center p-2">
-                            <Ionicons name="camera" size={30} color="#fbbf24" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity className="items-center p-2">
-                            <Ionicons name="images-outline" size={24} color="white" />
-                        </TouchableOpacity>
-                    </SafeAreaView>
-                </View>
+            {/* Capture Button Overlay */}
+            <View className="absolute bottom-6 left-0 right-0 items-center mb-8" pointerEvents="box-none">
+                <TouchableOpacity
+                    disabled={capturing}
+                    onPress={takePicture}
+                    className={
+                        capturing
+                            ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
+                            : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
+                    }
+                >
+                    <View className="w-[67px] h-[67px] rounded-full bg-white" />
+                </TouchableOpacity>
             </View>
 
             {/* Simple thumbnail strip at bottom (optional) */}

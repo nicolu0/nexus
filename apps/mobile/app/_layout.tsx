@@ -39,7 +39,7 @@ export default function RootLayout() {
         if (session === undefined) return; // still loading
 
         if (session) {
-            router.replace('/camera' as Href);
+            router.replace('/(tabs)/camera' as Href);
         } else {
             router.replace('/auth' as Href);
         }
@@ -57,7 +57,7 @@ export default function RootLayout() {
     return (
         <PhotoProvider>
             <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="camera" />
+                <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="auth" />
             </Stack>
         </PhotoProvider>
