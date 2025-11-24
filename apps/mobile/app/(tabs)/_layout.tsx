@@ -19,7 +19,7 @@ export default function TabLayout() {
                     paddingBottom: 20,
                     paddingTop: 12,
                 },
-                tabBarActiveTintColor: '#fbbf24', // amber-400
+                tabBarActiveTintColor: isCamera ? 'white' : 'black',
                 tabBarInactiveTintColor: isCamera ? 'white' : 'black',
             }}
         >
@@ -27,8 +27,8 @@ export default function TabLayout() {
                 name="dashboard"
                 options={{
                     title: 'Dashboard',
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="grid-outline" size={22} color={color} />
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons name={focused ? "grid" : "grid-outline"} size={22} color={color} />
                     ),
                 }}
             />
@@ -36,8 +36,8 @@ export default function TabLayout() {
                 name="camera"
                 options={{
                     title: 'Camera',
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="camera" size={28} color={color} />
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons name={focused ? "camera" : "camera-outline"} size={28} color={color} />
                     ),
                 }}
             />
@@ -45,8 +45,8 @@ export default function TabLayout() {
                 name="sessions"
                 options={{
                     title: 'Sessions',
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="images-outline" size={22} color={color} />
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons name={focused ? "images" : "images-outline"} size={22} color={color} />
                     ),
                 }}
             />
