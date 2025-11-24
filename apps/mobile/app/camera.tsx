@@ -214,7 +214,7 @@ export default function CameraScreen() {
                                     setShowUnitMenu(false);
                                     setShowMenu(false);
                                 }}
-                                className="flex-row items-center bg-black/40 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
+                                className="flex-row items-center bg-black/60 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
                             >
                                 <Text className="text-white font-medium mr-1 max-w-[120px]" numberOfLines={1}>
                                     {selectedProperty?.name || 'Select Property'}
@@ -265,7 +265,7 @@ export default function CameraScreen() {
                                     }
                                 }}
                                 disabled={!selectedProperty}
-                                className={`flex-row items-center bg-black/40 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
+                                className={`flex-row items-center bg-black/60 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
                             >
                                 <Text className="text-white font-medium mr-1 max-w-[80px]" numberOfLines={1}>
                                     {selectedUnit?.unit_number || 'Unit'}
@@ -314,7 +314,7 @@ export default function CameraScreen() {
                                 setShowPropertyMenu(false);
                                 setShowUnitMenu(false);
                             }}
-                            className="w-10 h-10 bg-black/40 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
+                            className="w-10 h-10 bg-black/60 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
                         >
                             <Ionicons name="person-circle-outline" size={28} color="white" />
                         </TouchableOpacity>
@@ -343,11 +343,11 @@ export default function CameraScreen() {
                         onPress={takePicture}
                         className={
                             capturing
-                                ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-4 border-white'
-                                : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-4 border-white'
+                                ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
+                                : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
                         }
                     >
-                        <View className="w-[60px] h-[60px] rounded-full bg-white" />
+                        <View className="w-[67px] h-[67px] rounded-full bg-white" />
                     </TouchableOpacity>
                 </View>
 
