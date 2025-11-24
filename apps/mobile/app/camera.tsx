@@ -335,21 +335,39 @@ export default function CameraScreen() {
             </SafeAreaView>
 
             {/* Bottom Controls Overlay */}
-            <SafeAreaView className="flex-1 justify-end pb-10" pointerEvents="box-none">
-                <View className="flex-row items-center justify-center">
+            <View className="absolute bottom-0 left-0 right-0" pointerEvents="box-none">
+                {/* Capture Button */}
+                <View className="items-center mb-16" pointerEvents="box-none">
                     <TouchableOpacity
                         disabled={capturing}
                         onPress={takePicture}
                         className={
                             capturing
-                                ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center'
-                                : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center'
+                                ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-4 border-white'
+                                : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-4 border-white'
                         }
                     >
-                        <View className="w-[68px] h-[68px] rounded-full bg-white" />
+                        <View className="w-[60px] h-[60px] rounded-full bg-white" />
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+
+                {/* Bottom Menu Bar */}
+                <View className="bg-neutral-800 w-full">
+                    <SafeAreaView edges={['bottom']} className="flex-row justify-around items-center pt-3 pb-2">
+                        <TouchableOpacity className="items-center p-2">
+                            <Ionicons name="grid-outline" size={24} color="white" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity className="items-center p-2">
+                            <Ionicons name="camera" size={30} color="#fbbf24" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity className="items-center p-2">
+                            <Ionicons name="images-outline" size={24} color="white" />
+                        </TouchableOpacity>
+                    </SafeAreaView>
+                </View>
+            </View>
 
             {/* Simple thumbnail strip at bottom (optional) */}
             {photos.length > 0 && (
