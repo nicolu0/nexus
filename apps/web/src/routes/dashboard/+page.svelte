@@ -189,20 +189,6 @@
 		showUnitModal = false;
 	};
 
-	const toNullableString = (value: string) => {
-		const trimmed = value.trim();
-		return trimmed.length > 0 ? trimmed : null;
-	};
-
-	const toNullableNumber = (value: string | number | null | undefined) => {
-		if (value === null || value === undefined) return null;
-		const asString = typeof value === 'number' ? String(value) : value;
-		const trimmed = asString.trim();
-		if (trimmed.length === 0) return null;
-		const parsed = Number(trimmed);
-		return Number.isFinite(parsed) ? parsed : null;
-	};
-
 	const submitUnit = async (event: SubmitEvent) => {
 		event.preventDefault();
 		if (unitSubmitting) return;

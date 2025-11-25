@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Triplet } from '$lib/types/dashboard';
 
-	const kinds = ['movein', 'moveout', 'repair'] as const;
+	const kinds = ['move-in', 'move-out', 'repair'] as const;
 
 	type PhotoKind = (typeof kinds)[number];
 
@@ -28,7 +28,7 @@
 						</div>
 					{/if}
 				</div>
-				<div class="text-[11px] font-medium text-stone-500 capitalize">
+				<div class="text-[11px] text-stone-500 capitalize">
 					{kind}
 				</div>
 			</div>
@@ -39,7 +39,7 @@
 		{#each kinds as kind}
 			<div class="flex flex-col gap-2">
 				<div
-					class="flex aspect-[4/3] w-full items-center justify-center rounded-md border border-dashed border-stone-300 bg-white text-xs text-stone-400"
+					class="flex aspect-[4/3] w-full items-center justify-center rounded-md border border-dashed border-stone-300 bg-white text-xs font-normal text-stone-400"
 				>
 					No {kind} photos
 				</div>

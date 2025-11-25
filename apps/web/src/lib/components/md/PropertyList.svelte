@@ -8,6 +8,7 @@
 
 	const loadingProperties = Array.from({ length: 6 });
 	const loadingUnits = Array.from({ length: 5 });
+	let collapsedPropertyIds = $state(new Set<string>());
 
 	let {
 		properties = [],
@@ -20,6 +21,18 @@
 		onAddUnit?: (property: Property) => void;
 		onSelectUnit?: (property: Property, unit: string) => void;
 	}>();
+
+	function togglePropertyUnits(propertyId: string) {
+		const next = new Set(collapsedPropertyIds);
+
+		if (next.has(propertyId)) {
+			next.delete(propertyId);
+		} else {
+			next.add(propertyId);
+		}
+
+		collapsedPropertyIds = next;
+	}
 </script>
 
 <div class="flex flex-col gap-4">
@@ -50,39 +63,65 @@
 		{/each}
 	{:else}
 		{#each properties as property (property.id)}
+			{@const isCollapsed = collapsedPropertyIds.has(property.id)}
 			<div class="flex flex-col gap-1">
 				<div
 					class="flex flex-col divide-y divide-stone-200 rounded-md border border-stone-200 bg-white"
 				>
 					<div class="flex items-center justify-between p-3">
-						<span class="flex flex-row items-center gap-2 text-sm font-medium text-stone-600">
+						<div class="flex flex-row items-center gap-2 text-sm font-medium text-stone-600">
 							<StatusDot />
 							{property.address}
-						</span>
+						</div>
 
-						<button
-							type="button"
-							class="rounded-md px-2 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50"
-							onclick={() => onAddUnit(property)}
-						>
-							+ Add unit
-						</button>
+						<div class="flex flex-row items-center gap-1">
+							<button
+								type="button"
+								class="rounded-md px-2 py-1 text-xs font-medium text-stone-500 hover:bg-stone-50"
+								onclick={() => onAddUnit(property)}
+							>
+								+ Add unit
+							</button>
+							<button
+								type="button"
+								class="rounded-md p-1 text-stone-500 transition hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400"
+								onclick={() => togglePropertyUnits(property.id)}
+								aria-expanded={!isCollapsed}
+								aria-label={`${isCollapsed ? 'Show' : 'Hide'} units for ${property.address}`}
+							>
+								<svg
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									class="h-4 w-4 transition-transform"
+									class:-rotate-90={isCollapsed}
+									aria-hidden="true"
+								>
+									<path d="M6 9l6 6 6-6" />
+								</svg>
+							</button>
+						</div>
 					</div>
 
-					{#each property.units as unit (unit)}
-						<button
-							class="flex flex-row items-center justify-between p-3 text-sm font-normal text-stone-600 transition hover:bg-stone-100"
-							onclick={() => onSelectUnit(property, unit)}
-						>
-							{unit}
-							<div class="flex flex-row gap-4">
-								<UnitStatusPill label="Kitchen" />
-							</div>
-						</button>
-					{/each}
+					{#if !isCollapsed}
+						{#each property.units as unit (unit)}
+							<button
+								class="flex flex-row items-center justify-between p-3 text-sm font-normal text-stone-600 transition hover:bg-stone-100"
+								onclick={() => onSelectUnit(property, unit)}
+							>
+								{unit}
+								<div class="flex flex-row gap-4">
+									<UnitStatusPill label="Kitchen" />
+								</div>
+							</button>
+						{/each}
 
-					{#if property.units.length === 0}
-						<div class="p-3 text-xs text-stone-400">No units yet.</div>
+						{#if property.units.length === 0}
+							<div class="p-3 text-xs text-stone-400">No units yet.</div>
+						{/if}
 					{/if}
 				</div>
 			</div>
