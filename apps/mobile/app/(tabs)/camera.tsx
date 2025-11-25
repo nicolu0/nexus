@@ -22,21 +22,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
     const filename = `${Date.now()}.${ext}`;
     const path = `raw/${filename}`;
 
-    const file = {
-        uri,
-        name: filename,
-        type: 'image/jpeg',
-    } as any;
+    // Use new File API
+    const file = new FileSystem.File(uri);
+    const base64 = await file.base64();
+
+    // Decode base64 to binary
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
 
     const { error } = await supabase.storage
         .from('unit-images')
-        .upload(path, file, {
+        .upload(path, bytes.buffer, {
             contentType: 'image/jpeg',
             upsert: false,
         });
