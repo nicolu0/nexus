@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DashboardScreen() {
     return (
-        <View className="flex-1 bg-white">
+        <View className="flex-1 bg-stone-50">
             <SafeAreaView className="flex-1 justify-center items-center">
                 <Text className="text-2xl font-bold text-black">Dashboard</Text>
             </SafeAreaView>
