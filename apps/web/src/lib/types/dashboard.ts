@@ -1,7 +1,12 @@
 export type Triplet = {
-	movein?: string;
-	moveout?: string;
+	'move-in'?: string;
+	'move-out'?: string;
 	repair?: string;
+};
+
+export type UnitSummary = {
+	id: string;
+	label: string;
 };
 
 export type Section = {
@@ -13,7 +18,7 @@ export type Section = {
 export type Property = {
 	id: string;
 	address: string;
-	units: string[];
+	units: UnitSummary[];
 };
 
 export type PropertyStatusFilter = 'all' | 'withUnits' | 'withoutUnits';

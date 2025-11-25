@@ -1,10 +1,10 @@
 <script lang="ts">
 	import StatusDot from '$lib/components/sm/StatusDot.svelte';
 	import UnitStatusPill from '$lib/components/sm/UnitStatusPill.svelte';
-	import type { Property } from '$lib/types/dashboard';
+	import type { Property, UnitSummary } from '$lib/types/dashboard';
 
 	const noop = () => {};
-	const noopSelect = (_property?: Property, _unit?: string) => {};
+	const noopSelect = (_property?: Property, _unit?: UnitSummary) => {};
 
 	const loadingProperties = Array.from({ length: 6 });
 	const loadingUnits = Array.from({ length: 5 });
@@ -19,7 +19,7 @@
 		properties?: Property[];
 		isLoading?: boolean;
 		onAddUnit?: (property: Property) => void;
-		onSelectUnit?: (property: Property, unit: string) => void;
+		onSelectUnit?: (property: Property, unit: UnitSummary) => void;
 	}>();
 
 	function togglePropertyUnits(propertyId: string) {
@@ -107,12 +107,12 @@
 					</div>
 
 					{#if !isCollapsed}
-						{#each property.units as unit (unit)}
+						{#each property.units as unit (unit.id)}
 							<button
 								class="flex flex-row items-center justify-between p-3 text-sm font-normal text-stone-600 transition hover:bg-stone-100"
 								onclick={() => onSelectUnit(property, unit)}
 							>
-								{unit}
+								{unit.label}
 								<div class="flex flex-row gap-4">
 									<UnitStatusPill label="Kitchen" />
 								</div>
