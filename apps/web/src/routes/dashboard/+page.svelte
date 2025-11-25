@@ -111,8 +111,7 @@
 
 		filteredProperties = properties.filter((property) => {
 			const addressText = (property.address ?? '').toLowerCase();
-			const propertyMatches =
-				propertyTerm.length === 0 || addressText.includes(propertyTerm);
+			const propertyMatches = propertyTerm.length === 0 || addressText.includes(propertyTerm);
 			const unitMatches =
 				unitTerm.length === 0 ||
 				property.units.some((unit) => unit.toLowerCase().includes(unitTerm));
@@ -256,9 +255,9 @@
 	<div class="relative flex min-h-0 flex-1 flex-row overflow-hidden">
 		<div class="flex min-h-0 w-full flex-col gap-4 overflow-y-auto px-10 py-6">
 			<PropertyToolbar
-				propertyQuery={propertyQuery}
-				unitQuery={unitQuery}
-				statusFilter={statusFilter}
+				{propertyQuery}
+				{unitQuery}
+				{statusFilter}
 				onPropertyQueryChange={(value) => {
 					propertyQuery = value;
 				}}
