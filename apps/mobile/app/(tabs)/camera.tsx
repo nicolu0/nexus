@@ -15,6 +15,8 @@ import {
     NativeSyntheticEvent,
     NativeScrollEvent,
     ViewToken,
+    Animated,
+    PanResponder,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -84,6 +86,9 @@ export default function CameraScreen() {
     const [showCustomSectionModal, setShowCustomSectionModal] = useState(false);
     const [customSectionText, setCustomSectionText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const slideAnim = useRef(new Animated.Value(-100)).current;
+    const panResponderRef = useRef<any>(null);
 
     const ITEM_WIDTH = 110;
 
@@ -114,6 +119,64 @@ export default function CameraScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
     }, [selectedSection]);
+
+    React.useEffect(() => {
+        if (toast) {
+            // Create pan responder for swipe-to-dismiss
+            panResponderRef.current = PanResponder.create({
+                onStartShouldSetPanResponder: () => true,
+                onMoveShouldSetPanResponder: (_, gestureState) => {
+                    // Only respond to vertical gestures
+                    return Math.abs(gestureState.dy) > 5;
+                },
+                onPanResponderMove: (_, gestureState) => {
+                    if (gestureState.dy < 0) {
+                        // Only allow upward swipes
+                        slideAnim.setValue(gestureState.dy);
+                    }
+                },
+                onPanResponderRelease: (_, gestureState) => {
+                    if (gestureState.dy < -50) {
+                        // Swipe up threshold reached - dismiss
+                        Animated.timing(slideAnim, {
+                            toValue: -100,
+                            duration: 200,
+                            useNativeDriver: true,
+                        }).start(() => setToast(null));
+                    } else {
+                        // Snap back to position
+                        Animated.spring(slideAnim, {
+                            toValue: 0,
+                            useNativeDriver: true,
+                        }).start();
+                    }
+                },
+            });
+
+            // Slide in
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+                tension: 50,
+                friction: 7,
+            }).start();
+
+            const timer = setTimeout(() => {
+                // Slide out
+                Animated.timing(slideAnim, {
+                    toValue: -100,
+                    duration: 200,
+                    useNativeDriver: true,
+                }).start(() => setToast(null));
+            }, 2000);
+
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
+    const showToast = (message: string, type: 'success' | 'error') => {
+        setToast({ message, type });
+    };
 
     async function fetchProperties() {
         try {
@@ -276,14 +339,16 @@ export default function CameraScreen() {
 
                     if (dbError) {
                         console.error('Error saving image metadata:', dbError);
-                        Alert.alert('Error', 'Failed to save image metadata');
+                        showToast('Failed to save image metadata', 'error');
                     } else {
                         console.log('Image metadata saved to database');
+                        showToast('Photo saved!', 'success');
                     }
                 }
             }
         } catch (e) {
             console.error('takePicture error:', e);
+            showToast('Failed to save photo.', 'error');
         } finally {
             setCapturing(false);
         }
@@ -298,6 +363,27 @@ export default function CameraScreen() {
 
     return (
         <View className="flex-1 bg-black">
+            {/* Toast Notification */}
+            {toast && (
+                <SafeAreaView className="absolute top-0 left-0 right-0 z-50" pointerEvents="box-none">
+                    <Animated.View
+                        {...(panResponderRef.current?.panHandlers || {})}
+                        style={{ transform: [{ translateY: slideAnim }] }}
+                        className="mx-4 mt-2"
+                    >
+                        <View className={`px-4 py-3 rounded-xl shadow-lg border-2 ${toast.type === 'success'
+                            ? 'bg-emerald-200 border-emerald-500'
+                            : 'bg-red-200 border-red-500'
+                            }`}>
+                            <Text className={`font-medium text-center ${toast.type === 'success' ? 'text-emerald-600' : 'text-red-600'
+                                }`}>
+                                {toast.message}
+                            </Text>
+                        </View>
+                    </Animated.View>
+                </SafeAreaView>
+            )}
+
             {/* Camera */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
