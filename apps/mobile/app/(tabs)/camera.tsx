@@ -77,6 +77,7 @@ export default function CameraScreen() {
     // Section Selector State
     const [sections, setSections] = useState<string[]>([]);
     const [selectedSection, setSelectedSection] = useState<string>('');
+    const [sectionIdMap, setSectionIdMap] = useState<{ [label: string]: string }>({});
     const [showCustomSectionModal, setShowCustomSectionModal] = useState(false);
     const [customSectionText, setCustomSectionText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
@@ -159,7 +160,7 @@ export default function CameraScreen() {
         try {
             const { data, error } = await supabase
                 .from('unit_sections')
-                .select('label')
+                .select('id, label')
                 .eq('unit_id', unitId)
                 .order('label');
 
@@ -167,10 +168,17 @@ export default function CameraScreen() {
 
             if (data && data.length > 0) {
                 const sectionLabels = data.map(s => s.label);
+                const idMap = data.reduce((acc, s) => {
+                    acc[s.label] = s.id;
+                    return acc;
+                }, {} as { [label: string]: string });
+
                 setSections(sectionLabels);
+                setSectionIdMap(idMap);
                 setSelectedSection(sectionLabels[0]);
             } else {
                 setSections([]);
+                setSectionIdMap({});
                 setSelectedSection('');
             }
         } catch (e) {
@@ -184,18 +192,21 @@ export default function CameraScreen() {
         const label = customSectionText.trim().charAt(0).toUpperCase() + customSectionText.trim().slice(1);
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('unit_sections')
                 .insert({
                     unit_id: selectedUnit.id,
                     label: label,
                     kind: 'custom'
-                });
+                })
+                .select('id, label')
+                .single();
 
             if (error) throw error;
 
             // Add to local state
             setSections([...sections, label]);
+            setSectionIdMap({ ...sectionIdMap, [label]: data.id });
             setSelectedSection(label);
             setCustomSectionText('');
             setShowCustomSectionModal(false);
@@ -248,6 +259,8 @@ export default function CameraScreen() {
                 // Store metadata in public.images
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
+                    const sectionId = sectionIdMap[selectedSection];
+
                     const { error: dbError } = await supabase
                         .from('images')
                         .insert({
@@ -255,7 +268,8 @@ export default function CameraScreen() {
                             created_by: user.id,
                             path: storagePath,
                             bucket: 'unit-images',
-                            section_name: selectedSection, // Use selected section
+                            section_name: selectedSection,
+                            section_id: sectionId,
                             taken_at: new Date().toISOString(),
                             mime_type: 'image/jpeg',
                         });
