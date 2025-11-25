@@ -58,8 +58,6 @@ async function uploadPhotoToSupabase(uri: string) {
 
 import { LinearGradient } from 'expo-linear-gradient';
 
-// ... (existing imports)
-
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
@@ -74,7 +72,6 @@ export default function CameraScreen() {
     const [selectedUnit, setSelectedUnit] = useState<{ id: string; unit_number: string } | null>(null);
     const { photos, addPhoto } = usePhotos();
 
-    // Section Selector State
     const [sections, setSections] = useState<string[]>([]);
     const [selectedSection, setSelectedSection] = useState<string>('');
     const [sectionIdMap, setSectionIdMap] = useState<{ [label: string]: string }>({});
@@ -107,7 +104,6 @@ export default function CameraScreen() {
     }, [selectedUnit]);
 
     React.useEffect(() => {
-        // Trigger haptic feedback when section changes
         if (selectedSection) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
@@ -204,7 +200,6 @@ export default function CameraScreen() {
 
             if (error) throw error;
 
-            // Add to local state
             setSections([...sections, label]);
             setSectionIdMap({ ...sectionIdMap, [label]: data.id });
             setSelectedSection(label);
@@ -256,7 +251,6 @@ export default function CameraScreen() {
                 );
                 console.log('Uploaded to Supabase:', storagePath, publicUrl);
 
-                // Store metadata in public.images
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
                     const sectionId = sectionIdMap[selectedSection];
@@ -464,7 +458,7 @@ export default function CameraScreen() {
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     snapToAlignment="start"
-                    snapToInterval={ITEM_WIDTH} // Fixed width for items
+                    snapToInterval={ITEM_WIDTH}
                     decelerationRate="fast"
                     disableIntervalMomentum={true}
                     contentContainerStyle={{ paddingHorizontal: (Dimensions.get('window').width - ITEM_WIDTH) / 2 }}
@@ -473,7 +467,7 @@ export default function CameraScreen() {
                         itemVisiblePercentThreshold: 50
                     }}
                     onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-                        if (tapTargetRef.current) return; // Skip updates during tap animation
+                        if (tapTargetRef.current) return;
 
                         const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
                         const item = [...sections, '+ Custom'][index];
@@ -484,14 +478,12 @@ export default function CameraScreen() {
                     scrollEventThrottle={16}
                     onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
                         if (tapTargetRef.current) {
-                            // Animation from tap completed
                             const target = tapTargetRef.current;
                             tapTargetRef.current = null;
                             if (target !== '+ Custom') {
                                 setSelectedSection(target);
                             }
                         } else {
-                            // Normal swipe
                             const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
                             const item = [...sections, '+ Custom'][index];
                             if (item && item !== '+ Custom') {
@@ -505,18 +497,18 @@ export default function CameraScreen() {
                                 if (item === '+ Custom') {
                                     setShowCustomSectionModal(true);
                                 } else {
-                                    tapTargetRef.current = item; // Store tap target
+                                    tapTargetRef.current = item;
                                     flatListRef.current?.scrollToOffset({ offset: index * ITEM_WIDTH, animated: true });
                                 }
                             }}
-                            style={{ width: ITEM_WIDTH, zIndex: selectedSection === item ? 50 : 1 }} // Fixed width, z-index for overlap
+                            style={{ width: ITEM_WIDTH, zIndex: selectedSection === item ? 50 : 1 }}
                             className="justify-center items-center h-full"
                         >
                             <View
                                 style={{
                                     position: 'absolute',
                                     minWidth: ITEM_WIDTH,
-                                    height: 34, // Fixed height for pill
+                                    height: 34,
                                 }}
                                 className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedSection === item && item !== '+ Custom'
                                     ? 'bg-stone-900/80 border border-white/30'
