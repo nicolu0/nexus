@@ -244,6 +244,56 @@ export default function CameraScreen() {
         }
     }
 
+    async function getOrCreateSession(unitId: string, userId: string) {
+        try {
+            // 1. Check for existing in_progress session
+            const { data: existingSession, error: fetchError } = await supabase
+                .from('sessions')
+                .select('id')
+                .eq('unit_id', unitId)
+                .eq('status', 'in_progress')
+                .eq('phase', 'move_in')
+                .order('last_activity_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+                throw fetchError;
+            }
+
+            if (existingSession) {
+                // Update last_activity_at
+                await supabase
+                    .from('sessions')
+                    .update({ last_activity_at: new Date().toISOString() })
+                    .eq('id', existingSession.id);
+
+                return existingSession.id;
+            }
+
+            // 2. Create new session if none exists
+            const { data: newSession, error: createError } = await supabase
+                .from('sessions')
+                .insert({
+                    unit_id: unitId,
+                    created_by: userId,
+                    status: 'in_progress',
+                    phase: 'move_in', // Default phase
+                    started_at: new Date().toISOString(),
+                    last_activity_at: new Date().toISOString(),
+                })
+                .select('id')
+                .single();
+
+            if (createError) throw createError;
+            return newSession.id;
+
+        } catch (e) {
+            console.error('Error managing session:', e);
+            throw e;
+        }
+    }
+
     const handleAddCustomSection = async () => {
         if (!customSectionText.trim() || !selectedUnit) return;
 
@@ -319,18 +369,17 @@ export default function CameraScreen() {
 
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
+                    // Get or create session
+                    const sessionId = await getOrCreateSession(selectedUnit.id, user.id);
                     const sectionId = sectionIdMap[selectedSection];
 
                     const { error: dbError } = await supabase
                         .from('images')
                         .insert({
-                            unit_id: selectedUnit.id,
                             created_by: user.id,
                             path: storagePath,
                             bucket: 'unit-images',
-                            section_name: selectedSection,
                             section_id: sectionId,
-                            taken_at: new Date().toISOString(),
                             mime_type: 'image/jpeg',
                         });
 
