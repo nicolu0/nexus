@@ -249,7 +249,7 @@ export default function CameraScreen() {
                                     setShowUnitMenu(false);
                                     setShowMenu(false);
                                 }}
-                                className="flex-row items-center bg-black/60 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
+                                className="flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
                             >
                                 <Text className="text-white font-medium mr-1 max-w-[120px]" numberOfLines={1}>
                                     {selectedProperty?.name || 'Select Property'}
@@ -259,7 +259,7 @@ export default function CameraScreen() {
 
                             {showPropertyMenu && (
                                 <View className="absolute top-full mt-2 left-0 w-full z-40">
-                                    <View className="bg-black/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
+                                    <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
                                         <ScrollView nestedScrollEnabled>
                                             {properties.map((prop) => (
                                                 <TouchableOpacity
@@ -300,7 +300,7 @@ export default function CameraScreen() {
                                     }
                                 }}
                                 disabled={!selectedProperty}
-                                className={`flex-row items-center bg-black/60 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
+                                className={`flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
                             >
                                 <Text className="text-white font-medium mr-1 max-w-[80px]" numberOfLines={1}>
                                     {selectedUnit?.unit_number || 'Unit'}
@@ -310,7 +310,7 @@ export default function CameraScreen() {
 
                             {showUnitMenu && (
                                 <View className="absolute top-full mt-2 left-0 w-full z-40">
-                                    <View className="bg-black/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
+                                    <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
                                         <ScrollView nestedScrollEnabled>
                                             {units.map((unit) => (
                                                 <TouchableOpacity
@@ -515,25 +515,6 @@ export default function CameraScreen() {
                     </View>
                 </View>
             </Modal>
-
-            {/* Simple thumbnail strip at bottom (optional) - Hidden for now to avoid clutter */}
-            {/* {photos.length > 0 && (
-                <View className="absolute bottom-3 left-0 right-0" pointerEvents="box-none">
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        className="px-3"
-                    >
-                        {photos.slice(-10).map((uri, idx) => (
-                            <Image
-                                key={`${uri}-${idx}`}
-                                source={{ uri }}
-                                className="w-14 h-14 rounded-md mr-2 border border-white/40"
-                            />
-                        ))}
-                    </ScrollView>
-                </View>
-            )} */}
         </View >
     );
 }
