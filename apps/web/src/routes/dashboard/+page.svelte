@@ -217,6 +217,17 @@
 			unitError = 'Unit number is required.';
 			return;
 		}
+	};
+
+	const openUnitModal = (property: Property) => {
+		unitForm = {
+			...createUnitForm(),
+			propertyId: property.id
+		};
+		unitPropertyLabel = property.address;
+		unitError = '';
+		showUnitModal = true;
+	};
 
 		unitSubmitting = true;
 		unitError = '';

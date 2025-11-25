@@ -8,12 +8,20 @@ import {
     Image,
     StyleSheet,
     Alert,
+    Modal,
+    TextInput,
+    FlatList,
+    Dimensions,
+    NativeSyntheticEvent,
+    NativeScrollEvent,
+    ViewToken,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../lib/supabase';
-import { usePhotos } from '../context/PhotoContext';
+import { supabase } from '../../lib/supabase';
+import { usePhotos } from '../../context/PhotoContext';
+import * as Haptics from 'expo-haptics';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -48,9 +56,14 @@ async function uploadPhotoToSupabase(uri: string) {
     };
 }
 
+import { LinearGradient } from 'expo-linear-gradient';
+
+// ... (existing imports)
+
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
+    const flatListRef = useRef<FlatList>(null);
     const [capturing, setCapturing] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showPropertyMenu, setShowPropertyMenu] = useState(false);
@@ -60,6 +73,15 @@ export default function CameraScreen() {
     const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string } | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<{ id: string; unit_number: string } | null>(null);
     const { photos, addPhoto } = usePhotos();
+
+    // Section Selector State
+    const [sections, setSections] = useState(['Kitchen', 'Bathroom 1', 'Bathroom 2', 'Bedroom', 'Master Bedroom', 'Living Room']);
+    const [selectedSection, setSelectedSection] = useState('Kitchen');
+    const [showCustomSectionModal, setShowCustomSectionModal] = useState(false);
+    const [customSectionText, setCustomSectionText] = useState('');
+    const tapTargetRef = useRef<string | null>(null);
+
+    const ITEM_WIDTH = 110;
 
     React.useEffect(() => {
         fetchProperties();
@@ -73,6 +95,11 @@ export default function CameraScreen() {
             setSelectedUnit(null);
         }
     }, [selectedProperty]);
+
+    React.useEffect(() => {
+        // Trigger haptic feedback when section changes
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, [selectedSection]);
 
     async function fetchProperties() {
         try {
@@ -110,14 +137,22 @@ export default function CameraScreen() {
 
             if (data) {
                 setUnits(data);
-                // Optional: Select first unit automatically? User didn't specify, but it's often good UX.
-                // Leaving it null for now to force explicit selection unless requested otherwise.
                 setSelectedUnit(null);
             }
         } catch (e) {
             console.error('Error fetching units:', e);
         }
     }
+
+    const handleAddCustomSection = () => {
+        if (customSectionText.trim()) {
+            const newSection = customSectionText.trim();
+            setSections([...sections, newSection]);
+            setSelectedSection(newSection);
+            setCustomSectionText('');
+            setShowCustomSectionModal(false);
+        }
+    };
 
     if (!permission) {
         return <View className="flex-1 bg-black" />;
@@ -169,7 +204,7 @@ export default function CameraScreen() {
                             created_by: user.id,
                             path: storagePath,
                             bucket: 'unit-images',
-                            section_name: 'General',
+                            section_name: selectedSection, // Use selected section
                             taken_at: new Date().toISOString(),
                             mime_type: 'image/jpeg',
                         });
@@ -214,7 +249,7 @@ export default function CameraScreen() {
                                     setShowUnitMenu(false);
                                     setShowMenu(false);
                                 }}
-                                className="flex-row items-center bg-black/40 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
+                                className="flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
                             >
                                 <Text className="text-white font-medium mr-1 max-w-[120px]" numberOfLines={1}>
                                     {selectedProperty?.name || 'Select Property'}
@@ -224,7 +259,7 @@ export default function CameraScreen() {
 
                             {showPropertyMenu && (
                                 <View className="absolute top-full mt-2 left-0 w-full z-40">
-                                    <View className="bg-black/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
+                                    <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
                                         <ScrollView nestedScrollEnabled>
                                             {properties.map((prop) => (
                                                 <TouchableOpacity
@@ -265,7 +300,7 @@ export default function CameraScreen() {
                                     }
                                 }}
                                 disabled={!selectedProperty}
-                                className={`flex-row items-center bg-black/40 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
+                                className={`flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
                             >
                                 <Text className="text-white font-medium mr-1 max-w-[80px]" numberOfLines={1}>
                                     {selectedUnit?.unit_number || 'Unit'}
@@ -275,7 +310,7 @@ export default function CameraScreen() {
 
                             {showUnitMenu && (
                                 <View className="absolute top-full mt-2 left-0 w-full z-40">
-                                    <View className="bg-black/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
+                                    <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
                                         <ScrollView nestedScrollEnabled>
                                             {units.map((unit) => (
                                                 <TouchableOpacity
@@ -314,7 +349,7 @@ export default function CameraScreen() {
                                 setShowPropertyMenu(false);
                                 setShowUnitMenu(false);
                             }}
-                            className="w-10 h-10 bg-black/40 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
+                            className="w-10 h-10 bg-black/60 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
                         >
                             <Ionicons name="person-circle-outline" size={28} color="white" />
                         </TouchableOpacity>
@@ -334,41 +369,152 @@ export default function CameraScreen() {
                 </View>
             </SafeAreaView>
 
-            {/* Bottom Controls Overlay */}
-            <SafeAreaView className="flex-1 justify-end pb-10" pointerEvents="box-none">
-                <View className="flex-row items-center justify-center">
-                    <TouchableOpacity
-                        disabled={capturing}
-                        onPress={takePicture}
-                        className={
-                            capturing
-                                ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center'
-                                : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center'
-                        }
-                    >
-                        <View className="w-[68px] h-[68px] rounded-full bg-white" />
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
+            {/* Capture Button Overlay */}
+            <View className="absolute bottom-0 left-0 right-0 mb-20 items-center z-20" pointerEvents="box-none">
+                <TouchableOpacity
+                    disabled={capturing}
+                    onPress={takePicture}
+                    className={
+                        capturing
+                            ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
+                            : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
+                    }
+                >
+                    <View className="w-[67px] h-[67px] rounded-full bg-white" />
+                </TouchableOpacity>
+            </View>
 
-            {/* Simple thumbnail strip at bottom (optional) */}
-            {photos.length > 0 && (
-                <View className="absolute bottom-3 left-0 right-0" pointerEvents="box-none">
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        className="px-3"
-                    >
-                        {photos.slice(-10).map((uri, idx) => (
-                            <Image
-                                key={`${uri}-${idx}`}
-                                source={{ uri }}
-                                className="w-14 h-14 rounded-md mr-2 border border-white/40"
-                            />
-                        ))}
-                    </ScrollView>
+            {/* Section Selector */}
+            <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-3">
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.8)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    className="absolute left-0 top-0 bottom-0 w-16 z-10"
+                    pointerEvents="none"
+                />
+                <FlatList
+                    ref={flatListRef}
+                    data={[...sections, '+ Custom']}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    snapToAlignment="start"
+                    snapToInterval={ITEM_WIDTH} // Fixed width for items
+                    decelerationRate="fast"
+                    disableIntervalMomentum={true}
+                    contentContainerStyle={{ paddingHorizontal: (Dimensions.get('window').width - ITEM_WIDTH) / 2 }}
+                    keyExtractor={(item: string) => item}
+                    viewabilityConfig={{
+                        itemVisiblePercentThreshold: 50
+                    }}
+                    onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+                        if (tapTargetRef.current) return; // Skip updates during tap animation
+
+                        const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
+                        const item = [...sections, '+ Custom'][index];
+                        if (item && item !== '+ Custom' && item !== selectedSection) {
+                            setSelectedSection(item);
+                        }
+                    }}
+                    scrollEventThrottle={16}
+                    onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+                        if (tapTargetRef.current) {
+                            // Animation from tap completed
+                            const target = tapTargetRef.current;
+                            tapTargetRef.current = null;
+                            if (target !== '+ Custom') {
+                                setSelectedSection(target);
+                            }
+                        } else {
+                            // Normal swipe
+                            const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
+                            const item = [...sections, '+ Custom'][index];
+                            if (item && item !== '+ Custom') {
+                                setSelectedSection(item);
+                            }
+                        }
+                    }}
+                    renderItem={({ item, index }: { item: string, index: number }) => (
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (item === '+ Custom') {
+                                    setShowCustomSectionModal(true);
+                                } else {
+                                    tapTargetRef.current = item; // Store tap target
+                                    flatListRef.current?.scrollToOffset({ offset: index * ITEM_WIDTH, animated: true });
+                                }
+                            }}
+                            style={{ width: ITEM_WIDTH, zIndex: selectedSection === item ? 50 : 1 }} // Fixed width, z-index for overlap
+                            className="justify-center items-center h-full"
+                        >
+                            <View
+                                style={{
+                                    position: 'absolute',
+                                    minWidth: ITEM_WIDTH,
+                                    height: 34, // Fixed height for pill
+                                }}
+                                className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedSection === item && item !== '+ Custom'
+                                    ? 'bg-stone-900/80 border border-white/30'
+                                    : ''
+                                    }`}
+                            >
+                                <Text
+                                    numberOfLines={1}
+                                    className={`text-base font-medium ${selectedSection === item
+                                        ? 'text-white'
+                                        : 'text-white/60'
+                                        }`}
+                                >
+                                    {item}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.8)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    className="absolute right-0 top-0 bottom-0 w-16 z-10"
+                    pointerEvents="none"
+                />
+            </View>
+
+            {/* Custom Section Modal */}
+            <Modal
+                visible={showCustomSectionModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowCustomSectionModal(false)}
+            >
+                <View className="flex-1 bg-black/80 justify-center items-center px-6">
+                    <View className="bg-stone-900 w-full rounded-2xl p-6 border border-white/10">
+                        <Text className="text-white text-xl font-bold mb-4">Add Custom Section</Text>
+                        <TextInput
+                            className="bg-stone-800 text-white p-4 rounded-xl mb-4 text-lg"
+                            placeholder="Section Name"
+                            placeholderTextColor="#666"
+                            value={customSectionText}
+                            onChangeText={setCustomSectionText}
+                            autoFocus
+                        />
+                        <View className="flex-row gap-4">
+                            <TouchableOpacity
+                                onPress={() => setShowCustomSectionModal(false)}
+                                className="flex-1 bg-stone-800 p-4 rounded-xl items-center"
+                            >
+                                <Text className="text-white font-semibold">Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleAddCustomSection}
+                                className="flex-1 bg-white p-4 rounded-xl items-center"
+                            >
+                                <Text className="text-black font-semibold">Add</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
-            )}
-        </View>
+            </Modal>
+        </View >
     );
 }
