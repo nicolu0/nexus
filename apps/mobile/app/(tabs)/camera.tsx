@@ -75,8 +75,8 @@ export default function CameraScreen() {
     const { photos, addPhoto } = usePhotos();
 
     // Section Selector State
-    const [sections, setSections] = useState(['Kitchen', 'Bathroom 1', 'Bathroom 2', 'Bedroom', 'Master Bedroom', 'Living Room']);
-    const [selectedSection, setSelectedSection] = useState('Kitchen');
+    const [sections, setSections] = useState<string[]>([]);
+    const [selectedSection, setSelectedSection] = useState<string>('');
     const [showCustomSectionModal, setShowCustomSectionModal] = useState(false);
     const [customSectionText, setCustomSectionText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
@@ -97,8 +97,19 @@ export default function CameraScreen() {
     }, [selectedProperty]);
 
     React.useEffect(() => {
+        if (selectedUnit) {
+            fetchUnitSections(selectedUnit.id);
+        } else {
+            setSections([]);
+            setSelectedSection('');
+        }
+    }, [selectedUnit]);
+
+    React.useEffect(() => {
         // Trigger haptic feedback when section changes
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (selectedSection) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
     }, [selectedSection]);
 
     async function fetchProperties() {
@@ -144,13 +155,53 @@ export default function CameraScreen() {
         }
     }
 
-    const handleAddCustomSection = () => {
-        if (customSectionText.trim()) {
-            const newSection = customSectionText.trim();
-            setSections([...sections, newSection]);
-            setSelectedSection(newSection);
+    async function fetchUnitSections(unitId: string) {
+        try {
+            const { data, error } = await supabase
+                .from('unit_sections')
+                .select('label')
+                .eq('unit_id', unitId)
+                .order('label');
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                const sectionLabels = data.map(s => s.label);
+                setSections(sectionLabels);
+                setSelectedSection(sectionLabels[0]);
+            } else {
+                setSections([]);
+                setSelectedSection('');
+            }
+        } catch (e) {
+            console.error('Error fetching unit sections:', e);
+        }
+    }
+
+    const handleAddCustomSection = async () => {
+        if (!customSectionText.trim() || !selectedUnit) return;
+
+        const label = customSectionText.trim().charAt(0).toUpperCase() + customSectionText.trim().slice(1);
+
+        try {
+            const { error } = await supabase
+                .from('unit_sections')
+                .insert({
+                    unit_id: selectedUnit.id,
+                    label: label,
+                    kind: 'custom'
+                });
+
+            if (error) throw error;
+
+            // Add to local state
+            setSections([...sections, label]);
+            setSelectedSection(label);
             setCustomSectionText('');
             setShowCustomSectionModal(false);
+        } catch (e) {
+            console.error('Error adding custom section:', e);
+            Alert.alert('Error', 'Failed to add custom section');
         }
     };
 
