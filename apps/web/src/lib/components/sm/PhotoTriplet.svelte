@@ -17,7 +17,9 @@
 	<div class="grid grid-cols-3 gap-3">
 		{#each kinds as kind}
 			<div class="flex flex-col gap-2">
-				<div class="relative aspect-[4/3] w-full overflow-hidden rounded-md border border-stone-200 bg-white">
+				<div
+					class="relative aspect-[4/3] w-full overflow-hidden rounded-md border border-stone-200 bg-white"
+				>
 					{#if photos[kind]}
 						<img src={photos[kind]} alt={getAlt(kind)} class="h-full w-full object-cover" />
 					{:else}
@@ -33,14 +35,13 @@
 		{/each}
 	</div>
 {:else}
-	<span class="text-sm text-stone-600">New item</span>
 	<div class="grid grid-cols-3 gap-3">
 		{#each kinds as kind}
 			<div class="flex flex-col gap-2">
 				<div
 					class="flex aspect-[4/3] w-full items-center justify-center rounded-md border border-dashed border-stone-300 bg-white text-xs text-stone-400"
 				>
-					Add {kind}
+					No {kind} photos
 				</div>
 			</div>
 		{/each}
