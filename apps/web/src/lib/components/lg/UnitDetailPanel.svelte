@@ -5,23 +5,23 @@
 
 	const noop = () => {};
 
-let {
-	selectedUnit = null,
-	selectedProperty = null,
-	sections = [],
-	onClose = noop,
-	onAddPhoto = noop,
-	isFullscreen = false,
-	onToggleFullscreen = noop
-} = $props<{
-	selectedUnit?: UnitSummary | null;
-	selectedProperty?: Property | null;
-	sections?: Section[];
-	onClose?: () => void;
-	onAddPhoto?: (section: Section) => void;
-	isFullscreen?: boolean;
-	onToggleFullscreen?: () => void;
-}>();
+	let {
+		selectedUnit = null,
+		selectedProperty = null,
+		sections = [],
+		onClose = noop,
+		onAddPhoto = noop,
+		isFullscreen = false,
+		onToggleFullscreen = noop
+	} = $props<{
+		selectedUnit?: UnitSummary | null;
+		selectedProperty?: Property | null;
+		sections?: Section[];
+		onClose?: () => void;
+		onAddPhoto?: (section: Section) => void;
+		isFullscreen?: boolean;
+		onToggleFullscreen?: () => void;
+	}>();
 
 	const shortAddr = (addr: string, n = 18) => (addr.length > n ? addr.slice(0, n) + '…' : addr);
 
@@ -44,34 +44,31 @@ let {
 			</div>
 			<div class="flex items-center gap-1">
 				<button
-					class="rounded-sm p-1 text-stone-400 transition hover:bg-stone-200 hover:text-stone-500"
+					class="flex h-5 w-5 items-center justify-center rounded-sm text-stone-400 transition hover:bg-stone-200 hover:text-stone-500"
 					onclick={onToggleFullscreen}
 					aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
 				>
 					<svg
-						class="h-4 w-4"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.5"
-						stroke-linecap="round"
-						stroke-linejoin="round"
+						xmlns="http://www.w3.org/2000/svg"
+						fill="currentColor"
+						class="bi bi-arrows-angle-expand h-3 w-3"
+						viewBox="0 0 16 16"
 					>
 						{#if isFullscreen}
-							<path d="M9 3H5a2 2 0 0 0-2 2v4" />
-							<path d="M15 3h4a2 2 0 0 1 2 2v4" />
-							<path d="M15 21h4a2 2 0 0 0 2-2v-4" />
-							<path d="M9 21H5a2 2 0 0 1-2-2v-4" />
+							<path
+								fill-rule="evenodd"
+								d="M.172 15.828a.5.5 0 0 0 .707 0l4.096-4.096V14.5a.5.5 0 1 0 1 0v-3.975a.5.5 0 0 0-.5-.5H1.5a.5.5 0 0 0 0 1h2.768L.172 15.121a.5.5 0 0 0 0 .707M15.828.172a.5.5 0 0 0-.707 0l-4.096 4.096V1.5a.5.5 0 1 0-1 0v3.975a.5.5 0 0 0 .5.5H14.5a.5.5 0 0 0 0-1h-2.768L15.828.879a.5.5 0 0 0 0-.707"
+							/>
 						{:else}
-							<path d="M15 3h6v6" />
-							<path d="M9 21H3v-6" />
-							<path d="M21 9v6" />
-							<path d="M3 9v6" />
+							<path
+								fill-rule="evenodd"
+								d="M5.828 10.172a.5.5 0 0 0-.707 0l-4.096 4.096V11.5a.5.5 0 0 0-1 0v3.975a.5.5 0 0 0 .5.5H4.5a.5.5 0 0 0 0-1H1.732l4.096-4.096a.5.5 0 0 0 0-.707m4.344-4.344a.5.5 0 0 0 .707 0l4.096-4.096V4.5a.5.5 0 1 0 1 0V.525a.5.5 0 0 0-.5-.5H11.5a.5.5 0 0 0 0 1h2.768l-4.096 4.096a.5.5 0 0 0 0 .707"
+							/>
 						{/if}
 					</svg>
 				</button>
 				<button
-					class="rounded-sm p-1 text-stone-400 transition hover:bg-stone-200 hover:text-stone-500"
+					class="h-5 w-5 rounded-sm text-stone-400 transition hover:bg-stone-200 hover:text-stone-500"
 					onclick={handleClose}
 					aria-label="Collapse"
 				>
@@ -80,7 +77,7 @@ let {
 						<path
 							d="M6 6 L11 10 L6 14"
 							stroke="currentColor"
-							stroke-width="1.2"
+							stroke-width="1"
 							stroke-linecap="round"
 							stroke-linejoin="round"
 						/>
@@ -88,7 +85,7 @@ let {
 						<path
 							d="M10 6 L15 10 L10 14"
 							stroke="currentColor"
-							stroke-width="1.2"
+							stroke-width="1"
 							stroke-linecap="round"
 							stroke-linejoin="round"
 						/>
