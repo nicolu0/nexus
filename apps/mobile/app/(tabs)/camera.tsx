@@ -122,29 +122,24 @@ export default function CameraScreen() {
 
     React.useEffect(() => {
         if (toast) {
-            // Create pan responder for swipe-to-dismiss
             panResponderRef.current = PanResponder.create({
                 onStartShouldSetPanResponder: () => true,
                 onMoveShouldSetPanResponder: (_, gestureState) => {
-                    // Only respond to vertical gestures
                     return Math.abs(gestureState.dy) > 5;
                 },
                 onPanResponderMove: (_, gestureState) => {
                     if (gestureState.dy < 0) {
-                        // Only allow upward swipes
                         slideAnim.setValue(gestureState.dy);
                     }
                 },
                 onPanResponderRelease: (_, gestureState) => {
                     if (gestureState.dy < -50) {
-                        // Swipe up threshold reached - dismiss
                         Animated.timing(slideAnim, {
                             toValue: -100,
                             duration: 200,
                             useNativeDriver: true,
                         }).start(() => setToast(null));
                     } else {
-                        // Snap back to position
                         Animated.spring(slideAnim, {
                             toValue: 0,
                             useNativeDriver: true,
@@ -153,7 +148,6 @@ export default function CameraScreen() {
                 },
             });
 
-            // Slide in
             Animated.spring(slideAnim, {
                 toValue: 0,
                 useNativeDriver: true,
@@ -162,7 +156,6 @@ export default function CameraScreen() {
             }).start();
 
             const timer = setTimeout(() => {
-                // Slide out
                 Animated.timing(slideAnim, {
                     toValue: -100,
                     duration: 200,
@@ -303,7 +296,11 @@ export default function CameraScreen() {
             return;
         }
 
+        // Haptic feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
         setCapturing(true);
+
         try {
             const photo = await cameraRef.current.takePictureAsync({
                 quality: 0.5,
@@ -525,11 +522,7 @@ export default function CameraScreen() {
                 <TouchableOpacity
                     disabled={capturing}
                     onPress={takePicture}
-                    className={
-                        capturing
-                            ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
-                            : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
-                    }
+                    className="w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10"
                 >
                     <View className="w-[67px] h-[67px] rounded-full bg-white" />
                 </TouchableOpacity>
