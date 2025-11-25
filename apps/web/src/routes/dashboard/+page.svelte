@@ -219,43 +219,6 @@
 		}
 	};
 
-	const openUnitModal = (property: Property) => {
-		unitForm = {
-			...createUnitForm(),
-			propertyId: property.id
-		};
-		unitPropertyLabel = property.address;
-		unitError = '';
-		showUnitModal = true;
-	};
-
-		unitSubmitting = true;
-		unitError = '';
-
-		const payload = {
-			property_id: unitForm.propertyId,
-			unit_number: unitForm.unitNumber.trim(),
-			floor: toNullableString(unitForm.floor),
-			beds: toNullableNumber(unitForm.beds),
-			baths: toNullableNumber(unitForm.baths),
-			sqft: toNullableNumber(unitForm.sqft),
-			notes: toNullableString(unitForm.notes)
-		};
-
-		try {
-			const { error } = await supabase.from('units').insert(payload);
-			if (error) {
-				throw error;
-			}
-			showUnitModal = false;
-			await loadProperties();
-		} catch (error) {
-			unitError = error instanceof Error ? error.message : 'Unable to create unit.';
-		} finally {
-			unitSubmitting = false;
-		}
-	};
-
 	const inputClasses =
 		'rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200';
 
