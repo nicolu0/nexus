@@ -46,33 +46,57 @@
 	};
 </script>
 
-<div class="flex w-full items-center justify-between">
-	<div class="flex flex-row gap-2">
-		<input
-			class="w-50 appearance-none rounded-md border border-stone-200 bg-white p-2 text-xs text-stone-900 ring-0
-					outline-none placeholder:text-stone-400
-					focus:border-stone-300 focus:ring-1 focus:ring-stone-300 focus:ring-offset-0
-					focus-visible:ring-1 focus-visible:ring-stone-300 focus-visible:outline-none"
-			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
-  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
-</svg>
-			placeholder="All Properties..."
-			value={propertyQuery}
-			oninput={handlePropertyInput}
-		/>
+<div class="flex w-full flex-wrap items-center justify-between gap-3">
+	<div class="flex flex-row flex-wrap gap-2">
+		<label
+			class="flex items-center rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-500 focus-within:border-stone-300 focus-within:ring-1 focus-within:ring-stone-300"
+		>
+			<span class="flex items-center text-stone-400">
+				<svg
+					viewBox="0 0 16 16"
+					fill="none"
+					xmlns="http://www.w3.org/2000/svg"
+					aria-hidden="true"
+					class="h-3 w-3"
+				>
+					<path
+						d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.018-.009Zm-5.242.656a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9Z"
+						fill="currentColor"
+					/>
+				</svg>
+			</span>
+			<input
+				class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none"
+				placeholder="All properties..."
+				value={propertyQuery}
+				oninput={handlePropertyInput}
+			/>
+		</label>
 
-		<input
-			class="w-50 appearance-none rounded-md border border-stone-200 bg-white p-2 text-xs text-stone-900 ring-0
-					outline-none placeholder:text-stone-400
-					focus:border-stone-300 focus:ring-1 focus:ring-stone-300 focus:ring-offset-0
-					focus-visible:ring-1 focus-visible:ring-stone-300 focus-visible:outline-none"
-			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
-  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
-</svg>
-			placeholder="All Units..."
-			value={unitQuery}
-			oninput={handleUnitInput}
-		/>
+		<label
+			class="flex items-center rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-500 focus-within:border-stone-300 focus-within:ring-1 focus-within:ring-stone-300"
+		>
+			<span class="flex items-center text-stone-400">
+				<svg
+					viewBox="0 0 16 16"
+					fill="none"
+					xmlns="http://www.w3.org/2000/svg"
+					aria-hidden="true"
+					class="h-3 w-3"
+				>
+					<path
+						d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.018-.009Zm-5.242.656a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9Z"
+						fill="currentColor"
+					/>
+				</svg>
+			</span>
+			<input
+				class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none"
+				placeholder="All units..."
+				value={unitQuery}
+				oninput={handleUnitInput}
+			/>
+		</label>
 	</div>
 
 	<button
