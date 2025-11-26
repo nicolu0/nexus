@@ -2,25 +2,11 @@ import React, { useRef, useState, useEffect } from 'react';
 import {
     View,
     Text,
-    TouchableOpacity,
     Button,
-    ScrollView,
-    Image,
     StyleSheet,
     Alert,
-    Modal,
-    TextInput,
-    FlatList,
-    Dimensions,
-    NativeSyntheticEvent,
-    NativeScrollEvent,
-    ViewToken,
-    Animated,
-    PanResponder,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
@@ -28,17 +14,16 @@ import * as FileSystem from 'expo-file-system';
 import { CameraTopControls, CameraTopControlsHandle } from '../../components/md/CameraTopControls';
 import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 import { CustomRoomModal } from '../../components/md/CustomRoomModal';
+import { ToastNotification } from '../../components/sm/ToastNotification';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
     const filename = `${Date.now()}.${ext}`;
     const path = `raw/${filename}`;
 
-    // Use new File API
     const file = new FileSystem.File(uri);
     const base64 = await file.base64();
 
-    // Decode base64 to binary
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -67,8 +52,6 @@ async function uploadPhotoToSupabase(uri: string) {
     };
 }
 
-import { LinearGradient } from 'expo-linear-gradient';
-
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
@@ -87,10 +70,7 @@ export default function CameraScreen() {
     const [customRoomText, setCustomRoomText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const slideAnim = useRef(new Animated.Value(-100)).current;
-    const panResponderRef = useRef<any>(null);
 
-    // Close dropdowns when custom room modal opens
     useEffect(() => {
         if (showCustomRoomModal) {
             topControlsRef.current?.closeDropdowns();
@@ -126,53 +106,6 @@ export default function CameraScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
     }, [selectedRoom]);
-
-    React.useEffect(() => {
-        if (toast) {
-            panResponderRef.current = PanResponder.create({
-                onStartShouldSetPanResponder: () => true,
-                onMoveShouldSetPanResponder: (_, gestureState) => {
-                    return Math.abs(gestureState.dy) > 5;
-                },
-                onPanResponderMove: (_, gestureState) => {
-                    if (gestureState.dy < 0) {
-                        slideAnim.setValue(gestureState.dy);
-                    }
-                },
-                onPanResponderRelease: (_, gestureState) => {
-                    if (gestureState.dy < -50) {
-                        Animated.timing(slideAnim, {
-                            toValue: -100,
-                            duration: 200,
-                            useNativeDriver: true,
-                        }).start(() => setToast(null));
-                    } else {
-                        Animated.spring(slideAnim, {
-                            toValue: 0,
-                            useNativeDriver: true,
-                        }).start();
-                    }
-                },
-            });
-
-            Animated.spring(slideAnim, {
-                toValue: 0,
-                useNativeDriver: true,
-                tension: 50,
-                friction: 7,
-            }).start();
-
-            const timer = setTimeout(() => {
-                Animated.timing(slideAnim, {
-                    toValue: -100,
-                    duration: 200,
-                    useNativeDriver: true,
-                }).start(() => setToast(null));
-            }, 2000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [toast]);
 
     const showToast = (message: string, type: 'success' | 'error') => {
         setToast({ message, type });
@@ -500,29 +433,15 @@ export default function CameraScreen() {
         <View className="flex-1 bg-black">
             {/* Toast Notification */}
             {toast && (
-                <SafeAreaView className="absolute top-0 left-0 right-0 z-50" pointerEvents="box-none">
-                    <Animated.View
-                        {...(panResponderRef.current?.panHandlers || {})}
-                        style={{ transform: [{ translateY: slideAnim }] }}
-                        className="mx-4 mt-2"
-                    >
-                        <View className={`px-4 py-3 rounded-xl shadow-lg border-2 ${toast.type === 'success'
-                            ? 'bg-emerald-200 border-emerald-500'
-                            : 'bg-red-200 border-red-500'
-                            }`}>
-                            <Text className={`font-medium text-center ${toast.type === 'success' ? 'text-emerald-600' : 'text-red-600'
-                                }`}>
-                                {toast.message}
-                            </Text>
-                        </View>
-                    </Animated.View>
-                </SafeAreaView>
+                <ToastNotification
+                    message={toast.message}
+                    type={toast.type}
+                    onDismiss={() => setToast(null)}
+                />
             )}
 
-            {/* Camera */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
-            {/* Top Controls */}
             <CameraTopControls
                 ref={topControlsRef}
                 properties={properties}
@@ -534,7 +453,6 @@ export default function CameraScreen() {
                 onSignOut={handleSignOut}
             />
 
-            {/* Bottom Controls */}
             <CameraBottomControls
                 rooms={rooms}
                 selectedRoom={selectedRoom}
@@ -546,7 +464,6 @@ export default function CameraScreen() {
                 tapTargetRef={tapTargetRef}
             />
 
-            {/* Custom Room Modal */}
             <CustomRoomModal
                 visible={showCustomRoomModal}
                 roomText={customRoomText}
