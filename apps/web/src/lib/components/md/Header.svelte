@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import nexusLogo from '$lib/assets/nexus.svg';
 </script>
 
@@ -12,8 +13,11 @@
 	<div class="flex items-center gap-4">
 		<button
 			type="button"
-			class="flex items-center rounded-full bg-stone-200 p-2 transition hover:border-stone-300"
+			class="flex items-center rounded-full bg-stone-200 p-2 transition hover:border-stone-300 focus-visible:outline-none"
 			aria-label="Sign out"
+			onclick={() => {
+				goto('/');
+			}}
 		>
 			<span class="font-mono tracking-tighter text-stone-500">
 				<svg

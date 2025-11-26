@@ -114,7 +114,7 @@
 		<!-- bottom fade-out (starts near the bottom now because hero is taller) -->
 		<div
 			class="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-64
-         bg-gradient-to-b from-transparent via-stone-50/40 to-stone-50"
+         bg-gradient-to-b from-transparent via-stone-50/80 to-stone-50"
 			aria-hidden="true"
 		></div>
 

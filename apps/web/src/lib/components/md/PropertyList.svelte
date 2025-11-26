@@ -71,20 +71,26 @@
 					<div class="flex items-center justify-between p-3">
 						<div class="flex flex-row items-center gap-2 text-sm font-medium text-stone-600">
 							<StatusDot />
-							{property.address}
+							{property.name}
 						</div>
 
 						<div class="flex flex-row items-center gap-1">
 							<button
 								type="button"
-								class="rounded-md px-2 py-1 text-xs font-medium text-stone-500 hover:bg-stone-50"
+								class="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-stone-500
+	       transition
+	       hover:bg-stone-50 focus-visible:ring-2
+	       focus-visible:ring-stone-300 focus-visible:outline-none"
 								onclick={() => onAddUnit(property)}
 							>
-								+ Add unit
+								<span class="mb-0.5 flex">+</span> Add unit
 							</button>
 							<button
 								type="button"
-								class="rounded-md p-1 text-stone-500 transition hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400"
+								class="flex items-center gap-1 rounded-md p-1 text-xs text-stone-500
+	       transition
+	       hover:bg-stone-50 focus-visible:ring-2
+	       focus-visible:ring-stone-300 focus-visible:outline-none"
 								onclick={() => togglePropertyUnits(property.id)}
 								aria-expanded={!isCollapsed}
 								aria-label={`${isCollapsed ? 'Show' : 'Hide'} units for ${property.address}`}
@@ -93,7 +99,7 @@
 									viewBox="0 0 24 24"
 									fill="none"
 									stroke="currentColor"
-									stroke-width="2"
+									stroke-width="1.8"
 									stroke-linecap="round"
 									stroke-linejoin="round"
 									class="h-4 w-4 transition-transform"
@@ -109,12 +115,17 @@
 					{#if !isCollapsed}
 						{#each property.units as unit (unit.id)}
 							<button
-								class="flex flex-row items-center justify-between p-3 text-sm font-normal text-stone-600 transition hover:bg-stone-100"
+								class="flex flex-row items-center justify-between p-3 text-sm font-normal text-stone-600 transition hover:bg-stone-100 focus-visible:outline-none"
 								onclick={() => onSelectUnit(property, unit)}
 							>
 								{unit.label}
-								<div class="flex flex-row gap-4">
-									<UnitStatusPill label="Kitchen" />
+								<div class="flex flex-row gap-2">
+									<UnitStatusPill label="Move-in" color="bg-blue-400" />
+									{#if unit.sections.length > 0}
+										{#each unit.sections as section (section.id)}
+											<UnitStatusPill label={section.label} />
+										{/each}
+									{/if}
 								</div>
 							</button>
 						{/each}

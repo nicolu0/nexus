@@ -1,24 +1,19 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import PhotoTriplet from '$lib/components/sm/PhotoTriplet.svelte';
-	import type { Property, Section, UnitSummary } from '$lib/types/dashboard';
+	import type { Property, UnitSummary } from '$lib/types/dashboard';
 
 	const noop = () => {};
 
 	let {
 		selectedUnit = null,
 		selectedProperty = null,
-		sections = [],
 		onClose = noop,
-		onAddPhoto = noop,
 		isFullscreen = false,
 		onToggleFullscreen = noop
 	} = $props<{
 		selectedUnit?: UnitSummary | null;
 		selectedProperty?: Property | null;
-		sections?: Section[];
 		onClose?: () => void;
-		onAddPhoto?: (section: Section) => void;
 		isFullscreen?: boolean;
 		onToggleFullscreen?: () => void;
 	}>();
@@ -40,11 +35,11 @@
 		<div class="flex w-full items-center justify-between p-3 text-xs font-medium text-stone-400">
 			<div class="truncate">
 				{selectedUnit ? selectedUnit.label : ''} /
-				{selectedProperty ? shortAddr(selectedProperty.address) : ''}
+				{selectedProperty ? shortAddr(selectedProperty.name) : ''}
 			</div>
 			<div class="flex items-center gap-1">
 				<button
-					class="flex h-5 w-5 items-center justify-center rounded-sm text-stone-400 transition hover:bg-stone-200 hover:text-stone-500"
+					class="flex h-5 w-5 items-center justify-center rounded-sm text-stone-500 transition hover:bg-stone-200 hover:text-stone-500"
 					onclick={onToggleFullscreen}
 					aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
 				>
@@ -68,39 +63,52 @@
 					</svg>
 				</button>
 				<button
-					class="h-5 w-5 rounded-sm text-stone-400 transition hover:bg-stone-200 hover:text-stone-500"
+					class="flex h-5 w-5 items-center justify-center rounded-sm text-stone-500 transition hover:bg-stone-200 hover:text-stone-500"
 					onclick={handleClose}
 					aria-label="Collapse"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						fill="currentColor"
-						class="bi bi-x"
 						viewBox="0 0 16 16"
+						class="h-4 w-4"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1"
+						stroke-linecap="round"
 					>
-						<path
-							d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"
-						/>
+						<line x1="4" y1="4" x2="12" y2="12" />
+						<line x1="12" y1="4" x2="4" y2="12" />
 					</svg>
 				</button>
 			</div>
 		</div>
-
-		<div class="flex flex-col gap-8 px-8 pt-4 pb-8">
-			{#each sections as section (section.id)}
-				<section class="flex flex-col">
-					<div class="flex flex-row justify-between">
-						<h2 class="mb-2 text-xl font-semibold text-stone-900">
-							{section.label}
-						</h2>
-						<button
-							class="h-6 rounded-md px-2 text-xs font-normal text-stone-600 hover:bg-stone-200"
-							onclick={() => onAddPhoto(section)}>+ Add photo</button
-						>
-					</div>
-					<PhotoTriplet photos={section.photos} label={section.label} />
-				</section>
-			{/each}
-		</div>
 	</div>
 {/if}
+
+<style>
+	.loading-sheen {
+		position: relative;
+		overflow: hidden;
+		background-color: rgb(231 229 228);
+	}
+
+	.loading-sheen::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(
+			120deg,
+			transparent 0%,
+			rgba(255, 255, 255, 0.8) 50%,
+			transparent 100%
+		);
+		transform: translateX(-100%);
+		animation: sheen 1s linear infinite;
+	}
+
+	@keyframes sheen {
+		to {
+			transform: translateX(100%);
+		}
+	}
+</style>

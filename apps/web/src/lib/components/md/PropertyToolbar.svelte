@@ -1,24 +1,14 @@
 <script lang="ts">
-	import StatusDot from '$lib/components/sm/StatusDot.svelte';
 	import type { PropertyStatusFilter } from '$lib/types/dashboard';
 
 	const noop = () => {};
 	const noopString = (_value: string) => {};
-	const noopStatus = (_value: PropertyStatusFilter) => {};
-
-	const statusOptions: { value: PropertyStatusFilter; label: string }[] = [
-		{ value: 'all', label: 'All statuses' },
-		{ value: 'withUnits', label: 'Has units' },
-		{ value: 'withoutUnits', label: 'No units yet' }
-	];
 
 	let {
 		propertyQuery = '',
 		unitQuery = '',
-		statusFilter = 'all',
 		onPropertyQueryChange = noopString,
 		onUnitQueryChange = noopString,
-		onStatusChange = noopStatus,
 		onAddProperty = noop
 	} = $props<{
 		propertyQuery?: string;
@@ -39,17 +29,12 @@
 		const target = event.currentTarget as HTMLInputElement;
 		onUnitQueryChange(target.value);
 	};
-
-	const handleStatusChange = (event: Event) => {
-		const target = event.currentTarget as HTMLSelectElement;
-		onStatusChange(target.value as PropertyStatusFilter);
-	};
 </script>
 
 <div class="flex w-full flex-wrap items-center justify-between gap-3">
 	<div class="flex flex-row flex-wrap gap-2">
 		<label
-			class="flex items-center rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-500 focus-within:border-stone-300 focus-within:ring-1 focus-within:ring-stone-300"
+			class="inline-flex h-8 items-center rounded-md border border-stone-200 bg-white px-2 text-xs transition focus-within:ring-1 focus-within:ring-stone-300"
 		>
 			<span class="flex items-center text-stone-400">
 				<svg
@@ -66,7 +51,7 @@
 				</svg>
 			</span>
 			<input
-				class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none"
+				class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:text-stone-400 focus:ring-0 focus:outline-none"
 				placeholder="All properties..."
 				value={propertyQuery}
 				oninput={handlePropertyInput}
@@ -74,7 +59,7 @@
 		</label>
 
 		<label
-			class="flex items-center rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-500 focus-within:border-stone-300 focus-within:ring-1 focus-within:ring-stone-300"
+			class="inline-flex h-8 items-center rounded-md border border-stone-200 bg-white px-2 text-xs transition focus-within:ring-1 focus-within:ring-stone-300"
 		>
 			<span class="flex items-center text-stone-400">
 				<svg
@@ -91,7 +76,7 @@
 				</svg>
 			</span>
 			<input
-				class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none"
+				class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:text-stone-400 focus:ring-0 focus:outline-none"
 				placeholder="All units..."
 				value={unitQuery}
 				oninput={handleUnitInput}
@@ -101,9 +86,10 @@
 
 	<button
 		type="button"
-		class="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50"
+		class="inline-flex h-8 items-center gap-1 rounded-md border border-stone-200 bg-white px-3 text-xs text-stone-500 transition hover:bg-stone-50 focus:ring-1 focus:ring-stone-300 focus:outline-none"
 		onclick={onAddProperty}
 	>
-		+ Add property
+		<span class="mb-0.5 flex">+</span>
+		Add property
 	</button>
 </div>

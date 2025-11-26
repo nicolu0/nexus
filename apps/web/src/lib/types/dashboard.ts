@@ -7,6 +7,7 @@ export type Triplet = {
 export type UnitSummary = {
 	id: string;
 	label: string;
+	sections: Section[];
 };
 
 export type Section = {
@@ -17,6 +18,7 @@ export type Section = {
 
 export type Property = {
 	id: string;
+	name: string;
 	address: string;
 	units: UnitSummary[];
 };

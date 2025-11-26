@@ -2,10 +2,16 @@
 	import PropertyList from '$lib/components/md/PropertyList.svelte';
 	import Header from '$lib/components/md/Header.svelte';
 	import PropertyToolbar from '$lib/components/md/PropertyToolbar.svelte';
-	import UnitDetailPanel from '$lib/components/lg/UnitDetailPanel.svelte';
-import type { Property, PropertyStatusFilter, Section, UnitSummary } from '$lib/types/dashboard';
+	import UnitPage from '$lib/components/lg/UnitPage.svelte';
+	import type { Property, PropertyStatusFilter, Section, UnitSummary } from '$lib/types/dashboard';
 	import supabase from '$lib/supabaseClient';
 	import { onMount } from 'svelte';
+
+	const DEFAULT_UNIT_SECTIONS = [
+		{ label: 'Kitchen', slug: 'kitchen' },
+		{ label: 'Bedroom', slug: 'bedroom' },
+		{ label: 'Bathroom', slug: 'bathroom' }
+	] as const;
 
 	let selectedUnit = $state<UnitSummary | null>(null);
 	let selectedProperty = $state<Property | null>(null);
@@ -41,47 +47,37 @@ import type { Property, PropertyStatusFilter, Section, UnitSummary } from '$lib/
 		notes: ''
 	});
 
-let showUnitModal = $state(false);
-let unitForm = $state(createUnitForm());
-let unitPropertyLabel = $state('');
-let unitSubmitting = $state(false);
-let unitError = $state('');
-let unitPanelFullscreen = $state(false);
+	let showUnitModal = $state(false);
+	let unitForm = $state(createUnitForm());
+	let unitPropertyLabel = $state('');
+	let unitSubmitting = $state(false);
+	let unitError = $state('');
+	let unitPanelFullscreen = $state(false);
 
 	const UNIT_IMAGES_BUCKET = 'unit-images';
-	const PHOTO_PHASES = [
-		{ value: 'move_in', label: 'Move in', sortOrder: 0 },
-		{ value: 'move_out', label: 'Move out', sortOrder: 1 },
-		{ value: 'repair', label: 'Repair', sortOrder: 2 }
-	] as const;
-	type PhotoPhase = (typeof PHOTO_PHASES)[number]['value'];
 
-	const createPhotoForm = () => ({
-		sectionId: null as string | null,
-		file: null as File | null,
-		phase: PHOTO_PHASES[0].value as PhotoPhase
+	const createSectionForm = () => ({
+		label: ''
 	});
 
-	let showPhotoModal = $state(false);
-	let photoForm = $state(createPhotoForm());
-	let photoSectionLabel = $state('');
-	let photoUnitLabel = $state('');
-	let photoPropertyLabel = $state('');
-	let photoUnitId = $state<string | null>(null);
-	let photoSubmitting = $state(false);
-	let photoError = $state('');
-	let photoDragActive = $state(false);
-	let photoFileInput: HTMLInputElement | null = null;
+	let showSectionModal = $state(false);
+	let sectionForm = $state(createSectionForm());
+	let sectionError = $state('');
+	let sectionSubmitting = $state(false);
+	let sectionUnitLabel = $state('');
+	let sectionPropertyName = $state('');
+	let sectionTargetUnitId = $state<string | null>(null);
+	let sectionTargetPropertyId = $state<string | null>(null);
 
 	const loadProperties = async () => {
 		isLoading = true;
 		try {
 			const { data: propertyRows, error } = await supabase
 				.from('properties')
-				.select(`id, name, address_line1, address_line2, city, state, postal_code`)
-				.order('created_at', { ascending: true });
+				.select(`id, name, address_line1, address_line2, city, state, postal_code`);
 
 			if (error) {
+				console.log(error);
 				throw error;
 			}
 
@@ -90,11 +86,35 @@ let unitPanelFullscreen = $state(false);
 					const { data: unitRows, error: unitsError } = await supabase
 						.from('units')
 						.select(`id, unit_number`)
-						.eq('property_id', property.id)
-						.order('created_at', { ascending: true });
+						.eq('property_id', property.id);
 
 					if (unitsError) {
 						console.error(`Unable to load units for property ${property.id}`, unitsError);
+					}
+
+					const unitIds = (unitRows ?? []).map((unit) => unit.id);
+					const sectionsByUnit = new Map<string, Section[]>();
+
+					if (unitIds.length > 0) {
+						const { data: sectionRows, error: sectionsError } = await supabase
+							.from('rooms')
+							.select('id, name, unit_id')
+							.in('unit_id', unitIds);
+
+						if (sectionsError) {
+							console.error(`Unable to load sections for property ${property.id}`, sectionsError);
+						}
+
+						for (const row of sectionRows ?? []) {
+							if (!row.unit_id) continue;
+							const nextSection: Section = {
+								id: row.id ?? `${row.unit_id}-section`,
+								label: row.name ?? 'Section',
+								photos: null
+							};
+							const existing = sectionsByUnit.get(row.unit_id) ?? [];
+							sectionsByUnit.set(row.unit_id, [...existing, nextSection]);
+						}
 					}
 
 					const cityState = [property.city, property.state].filter(Boolean).join(', ');
@@ -109,10 +129,12 @@ let unitPanelFullscreen = $state(false);
 
 					return {
 						id: property.id,
-						address: address || property.name || `Property ${idx + 1}`,
+						name: property.name || `Property ${idx + 1}`,
+						address: address,
 						units: (unitRows ?? []).map((unit, unitIndex) => ({
 							id: unit.id,
-							label: unit.unit_number ?? `Unit ${unitIndex + 1}`
+							label: unit.unit_number ?? `Unit ${unitIndex + 1}`,
+							sections: sectionsByUnit.get(unit.id) ?? []
 						}))
 					};
 				})
@@ -138,7 +160,11 @@ let unitPanelFullscreen = $state(false);
 
 		filteredProperties = properties.filter((property) => {
 			const addressText = (property.address ?? '').toLowerCase();
-			const propertyMatches = propertyTerm.length === 0 || addressText.includes(propertyTerm);
+			const nameText = (property.name ?? '').toLowerCase();
+			const propertyMatches =
+				propertyTerm.length === 0 ||
+				addressText.includes(propertyTerm) ||
+				nameText.includes(propertyTerm);
 			const unitMatches =
 				unitTerm.length === 0 ||
 				property.units.some((unit) => unit.label.toLowerCase().includes(unitTerm));
@@ -155,11 +181,13 @@ let unitPanelFullscreen = $state(false);
 	$effect(() => {
 		const unitId = selectedUnit?.id ?? null;
 		if (!unitId) {
-			sections = createSections();
+			sections = [];
+			sectionsError = '';
+			sectionsLoading = false;
 			unitPanelFullscreen = false;
 			return;
 		}
-		void loadUnitPhotos(unitId);
+		void loadSectionsForUnit(unitId);
 	});
 
 	const openPropertyModal = () => {
@@ -215,6 +243,7 @@ let unitPanelFullscreen = $state(false);
 			if (error) {
 				throw error;
 			}
+
 			showPropertyModal = false;
 			await loadProperties();
 		} catch (error) {
@@ -239,36 +268,28 @@ let unitPanelFullscreen = $state(false);
 		showUnitModal = false;
 	};
 
-	const openPhotoModal = (section: Section) => {
+	const openSectionModal = () => {
 		if (!selectedUnit || !selectedProperty) {
 			return;
 		}
-		photoForm = {
-			...createPhotoForm(),
-			sectionId: section.id
-		};
-		photoSectionLabel = section.label;
-		photoUnitLabel = selectedUnit.label;
-		photoUnitId = selectedUnit.id;
-		photoPropertyLabel = selectedProperty.address;
-		photoError = '';
-		photoDragActive = false;
-		showPhotoModal = true;
+		sectionForm = createSectionForm();
+		sectionError = '';
+		sectionTargetUnitId = selectedUnit.id;
+		sectionTargetPropertyId = selectedProperty.id;
+		sectionUnitLabel = selectedUnit.label;
+		sectionPropertyName = selectedProperty.name;
+		showSectionModal = true;
 	};
 
-	const closePhotoModal = () => {
-		if (photoSubmitting) return;
-		showPhotoModal = false;
-		photoForm = createPhotoForm();
-		photoDragActive = false;
-		photoUnitId = null;
-		photoError = '';
-		photoUnitLabel = '';
-		photoSectionLabel = '';
-		photoPropertyLabel = '';
-		if (photoFileInput) {
-			photoFileInput.value = '';
-		}
+	const closeSectionModal = () => {
+		if (sectionSubmitting) return;
+		showSectionModal = false;
+		sectionForm = createSectionForm();
+		sectionError = '';
+		sectionTargetUnitId = null;
+		sectionTargetPropertyId = null;
+		sectionUnitLabel = '';
+		sectionPropertyName = '';
 	};
 
 	const submitUnit = async (event: SubmitEvent) => {
@@ -300,9 +321,29 @@ let unitPanelFullscreen = $state(false);
 		};
 
 		try {
-			const { error } = await supabase.from('units').insert(payload);
-			if (error) {
-				throw error;
+			const { data: insertedUnit, error } = await supabase
+				.from('units')
+				.insert(payload)
+				.select('id, property_id')
+				.single();
+
+			if (error || !insertedUnit) {
+				throw error ?? new Error('Unable to create unit.');
+			}
+
+			const defaultSectionsPayload = DEFAULT_UNIT_SECTIONS.map((section) => ({
+				unit_id: insertedUnit.id,
+				label: section.label,
+				kind: 'preset'
+			}));
+
+			const { error: sectionInsertError } = await supabase
+				.from('unit_sections')
+				.insert(defaultSectionsPayload);
+
+			if (sectionInsertError) {
+				console.log(sectionInsertError);
+				throw sectionInsertError;
 			}
 
 			showUnitModal = false;
@@ -315,256 +356,193 @@ let unitPanelFullscreen = $state(false);
 		}
 	};
 
-	const handlePhotoFileSelection = (file: File | undefined | null) => {
-		if (!file) {
-			if (photoFileInput) {
-				photoFileInput.value = '';
-			}
-			photoForm = {
-				...photoForm,
-				file: null
-			};
-			photoError = '';
-			return;
-		}
-
-		const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
-
-		if (!isPng) {
-			photoError = 'Only PNG files are supported.';
-			if (photoFileInput) {
-				photoFileInput.value = '';
-			}
-			photoForm = {
-				...photoForm,
-				file: null
-			};
-			return;
-		}
-
-		photoError = '';
-		photoForm = {
-			...photoForm,
-			file
-		};
-	};
-
-	const handlePhotoFileChange = (event: Event) => {
-		const input = event.target as HTMLInputElement;
-		handlePhotoFileSelection(input.files?.[0] ?? null);
-	};
-
-	const triggerPhotoFileSelect = () => {
-		photoFileInput?.click();
-	};
-
-	const handlePhotoDragOver = (event: DragEvent) => {
+	const submitSection = async (event: SubmitEvent) => {
 		event.preventDefault();
-		photoDragActive = true;
-		if (event.dataTransfer) {
-			event.dataTransfer.dropEffect = 'copy';
-		}
-	};
+		if (sectionSubmitting) return;
 
-	const handlePhotoDragLeave = (event: DragEvent) => {
-		event.preventDefault();
-		photoDragActive = false;
-	};
+		const unitId = sectionTargetUnitId;
+		const propertyId = sectionTargetPropertyId;
 
-	const handlePhotoDrop = (event: DragEvent) => {
-		event.preventDefault();
-		photoDragActive = false;
-		const file = event.dataTransfer?.files?.[0];
-		handlePhotoFileSelection(file ?? null);
-	};
-
-	const submitPhoto = async (event: SubmitEvent) => {
-		event.preventDefault();
-		if (photoSubmitting) return;
-
-		if (!photoForm.file) {
-			photoError = 'Drag a PNG file into the drop zone or click to select one.';
+		if (!unitId || !propertyId) {
+			sectionError = 'Select a unit before adding a section.';
 			return;
 		}
 
-		if (!photoForm.sectionId || !photoUnitId) {
-			photoError = 'Select a unit and section before uploading.';
+		const trimmedLabel = sectionForm.label.trim();
+		if (!trimmedLabel) {
+			sectionError = 'Section name is required.';
 			return;
 		}
 
-		photoSubmitting = true;
-		photoError = '';
-
-		const { data: userData, error: authError } = await supabase.auth.getUser();
-
-		if (authError) {
-			photoSubmitting = false;
-			photoError = authError.message;
-			photoDragActive = false;
-			return;
-		}
-
-		const userId = userData.user?.id;
-
-		if (!userId) {
-			photoSubmitting = false;
-			photoError = 'Please sign in to upload photos.';
-			photoDragActive = false;
-			return;
-		}
-
-		const file = photoForm.file;
-		const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'png';
-		const uniqueId =
-			typeof crypto?.randomUUID === 'function'
-				? crypto.randomUUID()
-				: Math.random().toString(36).slice(2);
-		const filePath = `${photoUnitId}/${photoForm.sectionId}/${Date.now()}-${uniqueId}.${fileExtension}`;
-
-		const { error: storageError } = await supabase.storage
-			.from(UNIT_IMAGES_BUCKET)
-			.upload(filePath, file, {
-				cacheControl: '3600',
-				upsert: false,
-				contentType: file.type
-			});
-
-		if (storageError) {
-			photoError = storageError.message;
-			console.log(storageError);
-			photoSubmitting = false;
-			photoDragActive = false;
-			return;
-		}
-
-		const phaseDetails = PHOTO_PHASES.find((phase) => phase.value === photoForm.phase);
-		const sortOrder = phaseDetails?.sortOrder ?? 0;
+		sectionSubmitting = true;
+		sectionError = '';
 
 		try {
-			const { error: insertError } = await supabase.from('images').insert({
-				unit_id: photoUnitId,
-				section_name: photoSectionLabel,
-				phase: photoForm.phase,
-				bucket: UNIT_IMAGES_BUCKET,
-				path: filePath,
-				mime_type: file.type,
-				sort_order: sortOrder,
-				taken_at: null,
-				notes: null,
-				tenancy_id: null,
-				created_by: userId
-			});
+			const { data: insertedSection, error } = await supabase
+				.from('unit_sections')
+				.insert({
+					unit_id: unitId,
+					label: trimmedLabel,
+					kind: 'custom'
+				})
+				.select('id, label, unit_id')
+				.single();
 
-			if (insertError) {
-				throw insertError;
+			if (error || !insertedSection) {
+				throw error ?? new Error('Unable to add section.');
 			}
 
-			showPhotoModal = false;
-			photoForm = createPhotoForm();
-			photoUnitId = null;
-			photoUnitLabel = '';
-			photoSectionLabel = '';
-			photoPropertyLabel = '';
-			if (photoFileInput) {
-				photoFileInput.value = '';
+			const normalizedSection: Section = {
+				id: insertedSection.id ?? `${unitId}-${Date.now()}`,
+				label: insertedSection.label ?? trimmedLabel,
+				photos: null
+			};
+
+			await loadSectionsForUnit(unitId);
+
+			properties = properties.map((property) =>
+				property.id === propertyId
+					? {
+							...property,
+							units: property.units.map((unit) =>
+								unit.id === unitId
+									? { ...unit, sections: [...unit.sections, normalizedSection] }
+									: unit
+							)
+						}
+					: property
+			);
+
+			const updatedProperty = properties.find((property) => property.id === propertyId);
+			if (updatedProperty) {
+				selectedProperty = updatedProperty;
+				const updatedUnit = updatedProperty.units.find((unit) => unit.id === unitId);
+				if (updatedUnit) {
+					selectedUnit = updatedUnit;
+				}
 			}
+
+			showSectionModal = false;
+			sectionForm = createSectionForm();
+			sectionTargetUnitId = null;
+			sectionTargetPropertyId = null;
+			sectionUnitLabel = '';
+			sectionPropertyName = '';
 		} catch (error) {
-			console.log(error);
-			await supabase.storage.from(UNIT_IMAGES_BUCKET).remove([filePath]);
-			photoError = error instanceof Error ? error.message : 'Unable to save photo.';
+			sectionError = error instanceof Error ? error.message : 'Unable to add section.';
 		} finally {
-			photoSubmitting = false;
-			photoDragActive = false;
+			sectionSubmitting = false;
 		}
 	};
 
 	const inputClasses =
 		'rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200';
 
-const sectionDefinitions = [
-	{ id: 'kitchen', label: 'Kitchen' },
-	{ id: 'bathroom', label: 'Bathroom' },
-	{ id: 'bedroom', label: 'Bedroom' },
-	{ id: 'living', label: 'Living' },
-	{ id: 'other', label: 'Other' }
-] as const;
+	let sections = $state<Section[]>([]);
+	let sectionsLoading = $state(false);
+	let sectionsError = $state('');
+	let unitImagesRequestId = 0;
 
-const createSections = (): Section[] =>
-	sectionDefinitions.map((section) => ({
-		id: section.id,
-		label: section.label,
-		photos: null
-	}));
-
-let sections = $state<Section[]>(createSections());
-let unitImagesRequestId = 0;
-
-const phaseKeyFromValue = (phase: string | null): 'move-in' | 'move-out' | 'repair' => {
-	switch (phase) {
-		case 'move_in':
-			return 'move-in';
-		case 'move_out':
-			return 'move-out';
-		default:
-			return 'repair';
-	}
-};
-
-const loadUnitPhotos = async (unitId: string) => {
-	const requestId = ++unitImagesRequestId;
-
-	const nextSections = createSections();
-	const sectionMap = new Map(nextSections.map((section) => [section.id, section]));
-	sections = nextSections;
-
-	try {
-		const { data, error } = await supabase
-			.from('images')
-			.select('id, section_id, section_name, phase, bucket, path')
-			.eq('unit_id', unitId)
-			.order('section_name', { ascending: true })
-			.order('sort_order', { ascending: true })
-			.order('phase', { ascending: true });
-
-		if (error) {
-			throw error;
+	const phaseKeyFromValue = (phase: string | null): 'move-in' | 'move-out' | 'repair' => {
+		switch (phase) {
+			case 'move_in':
+				return 'move-in';
+			case 'move_out':
+				return 'move-out';
+			default:
+				return 'repair';
 		}
+	};
 
-		for (const row of data ?? []) {
-			if (!row.path) continue;
+	const loadSectionsForUnit = async (unitId: string) => {
+		const requestId = ++unitImagesRequestId;
+		sectionsLoading = true;
+		sectionsError = '';
 
-			const sectionId =
-				(row.section_id && sectionMap.has(row.section_id)) ? row.section_id : 'other';
-			const section = sectionMap.get(sectionId);
-			if (!section) continue;
+		try {
+			const { data: sectionRows, error: sectionError } = await supabase
+				.from('unit_sections')
+				.select('id, label')
+				.eq('unit_id', unitId)
+				.order('created_at', { ascending: true });
 
-			const bucketName = row.bucket || UNIT_IMAGES_BUCKET;
-			const publicUrl =
-				supabase.storage.from(bucketName).getPublicUrl(row.path).data?.publicUrl ?? null;
-			if (!publicUrl) continue;
+			if (sectionError) {
+				throw sectionError;
+			}
 
-			const phaseKey = phaseKeyFromValue(row.phase as string | null);
-			section.photos = {
-				...(section.photos ?? {}),
-				[phaseKey]: publicUrl
-			};
+			let resolvedSections =
+				sectionRows?.map((row, idx) => ({
+					id: row.id ?? `section-${idx}`,
+					label: row.label ?? 'Section',
+					photos: null
+				})) ?? [];
+
+			const sectionMap = new Map(resolvedSections.map((section) => [section.id, section]));
+
+			const sectionIds = sectionRows?.map((row) => row.id).filter(Boolean) ?? [];
+
+			let imageRows:
+				| {
+						id: string;
+						section_id: string | null;
+						phase: string | null;
+						bucket: string | null;
+						path: string | null;
+				  }[]
+				| null = [];
+
+			if (sectionIds.length > 0) {
+				const { data, error: imageError } = await supabase
+					.from('images')
+					.select('id, section_id, phase, bucket, path')
+					.in('section_id', sectionIds)
+					.order('created_at', { ascending: true });
+
+				if (imageError) {
+					throw imageError;
+				}
+
+				imageRows = data;
+			}
+
+			for (const row of imageRows ?? []) {
+				if (!row.path || !row.section_id) continue;
+				const section = sectionMap.get(row.section_id);
+				if (!section) continue;
+
+				const bucketName = row.bucket || UNIT_IMAGES_BUCKET;
+				const publicUrl =
+					supabase.storage.from(bucketName).getPublicUrl(row.path).data?.publicUrl ?? null;
+				if (!publicUrl) continue;
+
+				const phaseKey = phaseKeyFromValue(row.phase as string | null);
+				section.photos = {
+					...(section.photos ?? {}),
+					[phaseKey]: publicUrl
+				};
+			}
+
+			if (requestId === unitImagesRequestId) {
+				sections = Array.from(sectionMap.values());
+			}
+		} catch (error) {
+			if (requestId === unitImagesRequestId) {
+				sectionsError = error instanceof Error ? error.message : 'Unable to load unit sections.';
+				sections = [];
+			}
+			console.error('Unable to load unit sections', error);
+		} finally {
+			if (requestId === unitImagesRequestId) {
+				sectionsLoading = false;
+			}
 		}
-
-		if (requestId === unitImagesRequestId) {
-			sections = Array.from(sectionMap.values());
-		}
-	} catch (error) {
-		console.error('Unable to load unit photos', error);
-	} finally {
-		// no-op
-	}
-};
+	};
 
 	const handleDashboardKeydown = (event: KeyboardEvent) => {
 		if (event.key !== 'Escape') return;
-		if (showPhotoModal) {
+		if (showSectionModal) {
 			event.preventDefault();
-			closePhotoModal();
+			closeSectionModal();
 			return;
 		}
 		if (showUnitModal) {
@@ -617,15 +595,13 @@ const loadUnitPhotos = async (unitId: string) => {
 				}}
 			/>
 		</div>
-		<UnitDetailPanel
-			{sections}
+		<UnitPage
 			{selectedUnit}
 			{selectedProperty}
 			isFullscreen={unitPanelFullscreen}
 			onToggleFullscreen={() => {
 				unitPanelFullscreen = !unitPanelFullscreen;
 			}}
-			onAddPhoto={openPhotoModal}
 			onClose={() => {
 				selectedUnit = null;
 				selectedProperty = null;
@@ -644,7 +620,7 @@ const loadUnitPhotos = async (unitId: string) => {
 			class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
 			onclick={handleModalPanelClick}
 		>
-			<h2 class="text-xl font-semibold text-stone-900">Add property</h2>
+			<h2 class="text-xl font-semibold text-stone-900">Add Property</h2>
 			<p class="mt-1 text-sm text-stone-500">Enter a name and address for the new property.</p>
 
 			{#if propertyError}
@@ -728,7 +704,7 @@ const loadUnitPhotos = async (unitId: string) => {
 			class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
 			onclick={handleModalPanelClick}
 		>
-			<h2 class="text-xl font-semibold text-stone-900">Add unit</h2>
+			<h2 class="text-xl font-semibold text-stone-900">Add Unit</h2>
 			<p class="mt-1 text-sm text-stone-500">
 				Add a unit to <span class="font-semibold text-stone-800">{unitPropertyLabel}</span>.
 			</p>
@@ -749,47 +725,6 @@ const loadUnitPhotos = async (unitId: string) => {
 					/>
 				</label>
 
-				<label class="flex flex-col gap-1 text-xs font-medium text-stone-500">
-					<span>Floor</span>
-					<input
-						type="text"
-						class={inputClasses}
-						placeholder="e.g. 3 or Penthouse"
-						bind:value={unitForm.floor}
-					/>
-				</label>
-
-				<div class="grid gap-4 sm:grid-cols-3">
-					<label class="flex flex-col gap-1 text-xs font-medium text-stone-500">
-						<span>Beds</span>
-						<input type="number" min="0" class={inputClasses} bind:value={unitForm.beds} />
-					</label>
-					<label class="flex flex-col gap-1 text-xs font-medium text-stone-500">
-						<span>Baths</span>
-						<input
-							type="number"
-							min="0"
-							step="0.5"
-							class={inputClasses}
-							bind:value={unitForm.baths}
-						/>
-					</label>
-					<label class="flex flex-col gap-1 text-xs font-medium text-stone-500">
-						<span>Sqft</span>
-						<input type="number" min="0" class={inputClasses} bind:value={unitForm.sqft} />
-					</label>
-				</div>
-
-				<label class="flex flex-col gap-1 text-xs font-medium text-stone-500">
-					<span>Notes</span>
-					<textarea
-						rows="3"
-						class={`resize-none ${inputClasses}`}
-						placeholder="Optional notes"
-						bind:value={unitForm.notes}
-					></textarea>
-				</label>
-
 				<div class="flex justify-end gap-2 pt-2">
 					<button
 						type="button"
@@ -805,110 +740,6 @@ const loadUnitPhotos = async (unitId: string) => {
 						disabled={unitSubmitting}
 					>
 						{unitSubmitting ? 'Saving…' : 'Save unit'}
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
-{/if}
-
-{#if showPhotoModal}
-	<div
-		class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-10"
-		onclick={closePhotoModal}
-	>
-		<div
-			class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
-			onclick={handleModalPanelClick}
-		>
-			<h2 class="text-xl font-semibold text-stone-900">Add photo</h2>
-			<p class="mt-1 text-sm text-stone-500">
-				Upload a PNG for <span class="font-semibold text-stone-800">{photoSectionLabel}</span> in
-				<span class="font-semibold text-stone-800">{photoUnitLabel}</span>
-				{#if photoPropertyLabel}
-					<span class="text-stone-400">({photoPropertyLabel})</span>
-				{/if}
-			</p>
-
-			{#if photoError}
-				<p class="mt-4 rounded-lg bg-rose-100 px-3 py-2 text-sm text-rose-900">{photoError}</p>
-			{/if}
-
-			<form class="mt-4 flex flex-col gap-4" onsubmit={submitPhoto}>
-				<label class="flex flex-col gap-1 text-xs font-medium text-stone-500">
-					<span>Phase</span>
-					<select class={inputClasses} bind:value={photoForm.phase} disabled={photoSubmitting}>
-						{#each PHOTO_PHASES as phase}
-							<option value={phase.value}>{phase.label}</option>
-						{/each}
-					</select>
-				</label>
-
-				<div class="flex flex-col gap-2">
-					<span class="text-xs font-medium tracking-wide text-stone-500 uppercase">PNG file</span>
-					<div
-						class={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center text-sm transition-colors ${
-							photoDragActive
-								? 'border-stone-500 bg-stone-50'
-								: 'border-stone-300 bg-stone-50/60 hover:border-stone-400 hover:bg-stone-50'
-						}`}
-						role="button"
-						tabindex="0"
-						onclick={triggerPhotoFileSelect}
-						ondragover={handlePhotoDragOver}
-						ondragleave={handlePhotoDragLeave}
-						ondrop={handlePhotoDrop}
-					>
-						{#if photoForm.file}
-							<div class="flex flex-col items-center gap-1">
-								<span class="text-base font-medium text-stone-900">{photoForm.file.name}</span>
-								<span class="text-xs text-stone-500">
-									{Math.round(photoForm.file.size / 1024)} KB
-								</span>
-								<button
-									type="button"
-									class="mt-2 text-xs font-semibold text-stone-600 underline"
-									onclick={(event) => {
-										event.stopPropagation();
-										handlePhotoFileSelection(null);
-									}}
-								>
-									Clear selection
-								</button>
-							</div>
-						{:else}
-							<div class="flex flex-col items-center gap-1 text-stone-500">
-								<span class="text-base font-semibold text-stone-900">Drag & drop your PNG</span>
-								<span>or click to browse from Finder</span>
-								<span class="text-xs text-stone-400">Max 10MB</span>
-							</div>
-						{/if}
-					</div>
-				</div>
-
-				<input
-					type="file"
-					accept="image/png"
-					class="hidden"
-					bind:this={photoFileInput}
-					onchange={handlePhotoFileChange}
-				/>
-
-				<div class="flex justify-end gap-2 pt-2">
-					<button
-						type="button"
-						class="rounded-lg border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
-						onclick={closePhotoModal}
-						disabled={photoSubmitting}
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
-						disabled={photoSubmitting || !photoForm.file}
-					>
-						{photoSubmitting ? 'Saving…' : photoForm.file ? 'Save photo' : 'Select a PNG'}
 					</button>
 				</div>
 			</form>
