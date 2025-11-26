@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -25,7 +25,7 @@ import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
-import { CameraTopControls } from '../../components/md/CameraTopControls';
+import { CameraTopControls, CameraTopControlsHandle } from '../../components/md/CameraTopControls';
 import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 
@@ -72,6 +72,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
+    const topControlsRef = useRef<CameraTopControlsHandle>(null);
     const [capturing, setCapturing] = useState(false);
     const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
     const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
@@ -88,6 +89,13 @@ export default function CameraScreen() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const slideAnim = useRef(new Animated.Value(-100)).current;
     const panResponderRef = useRef<any>(null);
+
+    // Close dropdowns when custom room modal opens
+    useEffect(() => {
+        if (showCustomRoomModal) {
+            topControlsRef.current?.closeDropdowns();
+        }
+    }, [showCustomRoomModal]);
 
     const ITEM_WIDTH = 110;
 
@@ -516,6 +524,7 @@ export default function CameraScreen() {
 
             {/* Top Controls */}
             <CameraTopControls
+                ref={topControlsRef}
                 properties={properties}
                 units={units}
                 selectedProperty={selectedProperty}

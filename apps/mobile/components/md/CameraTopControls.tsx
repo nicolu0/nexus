@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { PropertySelector } from '../sm/PropertySelector';
 import { UnitSelector } from '../sm/UnitSelector';
 import { ProfileMenu } from '../sm/ProfileMenu';
@@ -25,9 +26,13 @@ interface CameraTopControlsProps {
     onSignOut: () => void;
 }
 
+export interface CameraTopControlsHandle {
+    closeDropdowns: () => void;
+}
+
 type OpenMenu = 'property' | 'unit' | 'profile' | null;
 
-export function CameraTopControls({
+export const CameraTopControls = forwardRef<CameraTopControlsHandle, CameraTopControlsProps>(({
     properties,
     units,
     selectedProperty,
@@ -35,8 +40,22 @@ export function CameraTopControls({
     onSelectProperty,
     onSelectUnit,
     onSignOut,
-}: CameraTopControlsProps) {
+}, ref) => {
     const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+
+    // Expose closeDropdowns method to parent
+    useImperativeHandle(ref, () => ({
+        closeDropdowns: () => setOpenMenu(null),
+    }));
+
+    // Close any open dropdown when the tab loses focus
+    useFocusEffect(
+        useCallback(() => {
+            return () => {
+                setOpenMenu(null);
+            };
+        }, [])
+    );
 
     return (
         <SafeAreaView className="absolute top-0 left-0 right-0 z-10" pointerEvents="box-none">
@@ -69,4 +88,4 @@ export function CameraTopControls({
             </View>
         </SafeAreaView>
     );
-}
+});
