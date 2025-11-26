@@ -27,6 +27,7 @@ import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
 import { CameraTopControls } from '../../components/md/CameraTopControls';
 import { CameraBottomControls } from '../../components/md/CameraBottomControls';
+import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -537,40 +538,13 @@ export default function CameraScreen() {
             />
 
             {/* Custom Room Modal */}
-            <Modal
+            <CustomRoomModal
                 visible={showCustomRoomModal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowCustomRoomModal(false)}
-            >
-                <View className="flex-1 bg-black/80 justify-center items-center px-6">
-                    <View className="bg-stone-900 w-full rounded-2xl p-6 border border-white/10">
-                        <Text className="text-white text-xl font-bold mb-4">Add Custom Room</Text>
-                        <TextInput
-                            className="bg-stone-800 text-white p-4 rounded-xl mb-4 text-lg"
-                            placeholder="Room Name"
-                            placeholderTextColor="#666"
-                            value={customRoomText}
-                            onChangeText={setCustomRoomText}
-                            autoFocus
-                        />
-                        <View className="flex-row gap-4">
-                            <TouchableOpacity
-                                onPress={() => setShowCustomRoomModal(false)}
-                                className="flex-1 bg-stone-800 p-4 rounded-xl items-center"
-                            >
-                                <Text className="text-white font-semibold">Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={handleAddCustomRoom}
-                                className="flex-1 bg-white p-4 rounded-xl items-center"
-                            >
-                                <Text className="text-black font-semibold">Add Room</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+                roomText={customRoomText}
+                onChangeText={setCustomRoomText}
+                onCancel={() => setShowCustomRoomModal(false)}
+                onSubmit={handleAddCustomRoom}
+            />
         </View >
     );
 }
