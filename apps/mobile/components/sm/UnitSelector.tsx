@@ -12,7 +12,8 @@ interface UnitSelectorProps {
     selectedUnit: Unit | null;
     onSelectUnit: (unit: Unit) => void;
     disabled?: boolean;
-    onOpen?: () => void;
+    isOpen: boolean;
+    onToggle: () => void;
 }
 
 export function UnitSelector({
@@ -20,22 +21,19 @@ export function UnitSelector({
     selectedUnit,
     onSelectUnit,
     disabled,
-    onOpen,
+    isOpen,
+    onToggle,
 }: UnitSelectorProps) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    const handleOpen = () => {
-        if (disabled) return;
-        setIsOpen(!isOpen);
-        if (!isOpen && onOpen) {
-            onOpen();
+    const handleToggle = () => {
+        if (!disabled) {
+            onToggle();
         }
     };
 
     return (
         <View className="relative">
             <TouchableOpacity
-                onPress={handleOpen}
+                onPress={handleToggle}
                 disabled={disabled}
                 className={`flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${disabled ? 'opacity-50' : ''}`}
             >
@@ -54,7 +52,7 @@ export function UnitSelector({
                                     key={unit.id}
                                     onPress={() => {
                                         onSelectUnit(unit);
-                                        setIsOpen(false);
+                                        onToggle();
                                     }}
                                     className="px-4 py-3 border-b border-white/10 last:border-0"
                                 >

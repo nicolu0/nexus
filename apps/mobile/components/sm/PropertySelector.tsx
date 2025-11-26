@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,28 +11,21 @@ interface PropertySelectorProps {
     properties: Property[];
     selectedProperty: Property | null;
     onSelectProperty: (property: Property) => void;
-    onOpen?: () => void;
+    isOpen: boolean;
+    onToggle: () => void;
 }
 
 export function PropertySelector({
     properties,
     selectedProperty,
     onSelectProperty,
-    onOpen,
+    isOpen,
+    onToggle,
 }: PropertySelectorProps) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    const handleOpen = () => {
-        setIsOpen(!isOpen);
-        if (!isOpen && onOpen) {
-            onOpen();
-        }
-    };
-
     return (
         <View className="relative">
             <TouchableOpacity
-                onPress={handleOpen}
+                onPress={onToggle}
                 className="flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
             >
                 <Text className="text-white font-medium mr-1 max-w-[120px]" numberOfLines={1}>
@@ -50,7 +43,7 @@ export function PropertySelector({
                                     key={prop.id}
                                     onPress={() => {
                                         onSelectProperty(prop);
-                                        setIsOpen(false);
+                                        onToggle();
                                     }}
                                     className="px-4 py-3 border-b border-white/10 last:border-0"
                                 >

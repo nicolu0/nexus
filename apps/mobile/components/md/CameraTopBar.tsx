@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PropertySelector } from '../sm/PropertySelector';
@@ -25,6 +25,8 @@ interface CameraTopBarProps {
     onSignOut: () => void;
 }
 
+type OpenMenu = 'property' | 'unit' | 'profile' | null;
+
 export function CameraTopBar({
     properties,
     units,
@@ -34,6 +36,8 @@ export function CameraTopBar({
     onSelectUnit,
     onSignOut,
 }: CameraTopBarProps) {
+    const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+
     return (
         <SafeAreaView className="absolute top-0 left-0 right-0 z-10" pointerEvents="box-none">
             <View className="flex-row justify-between px-4 pt-2" pointerEvents="box-none">
@@ -43,17 +47,25 @@ export function CameraTopBar({
                         properties={properties}
                         selectedProperty={selectedProperty}
                         onSelectProperty={onSelectProperty}
+                        isOpen={openMenu === 'property'}
+                        onToggle={() => setOpenMenu(openMenu === 'property' ? null : 'property')}
                     />
                     <UnitSelector
                         units={units}
                         selectedUnit={selectedUnit}
                         onSelectUnit={onSelectUnit}
                         disabled={!selectedProperty}
+                        isOpen={openMenu === 'unit'}
+                        onToggle={() => setOpenMenu(openMenu === 'unit' ? null : 'unit')}
                     />
                 </View>
 
                 {/* Profile Menu (Right) */}
-                <ProfileMenu onSignOut={onSignOut} />
+                <ProfileMenu
+                    onSignOut={onSignOut}
+                    isOpen={openMenu === 'profile'}
+                    onToggle={() => setOpenMenu(openMenu === 'profile' ? null : 'profile')}
+                />
             </View>
         </SafeAreaView>
     );
