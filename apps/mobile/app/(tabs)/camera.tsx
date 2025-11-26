@@ -15,6 +15,8 @@ import {
     NativeSyntheticEvent,
     NativeScrollEvent,
     ViewToken,
+    Animated,
+    PanResponder,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,21 +24,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
     const filename = `${Date.now()}.${ext}`;
     const path = `raw/${filename}`;
 
-    const file = {
-        uri,
-        name: filename,
-        type: 'image/jpeg',
-    } as any;
+    // Use new File API
+    const file = new FileSystem.File(uri);
+    const base64 = await file.base64();
+
+    // Decode base64 to binary
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
 
     const { error } = await supabase.storage
         .from('unit-images')
-        .upload(path, file, {
+        .upload(path, bytes.buffer, {
             contentType: 'image/jpeg',
             upsert: false,
         });
@@ -58,8 +66,6 @@ async function uploadPhotoToSupabase(uri: string) {
 
 import { LinearGradient } from 'expo-linear-gradient';
 
-// ... (existing imports)
-
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
@@ -74,13 +80,15 @@ export default function CameraScreen() {
     const [selectedUnit, setSelectedUnit] = useState<{ id: string; unit_number: string } | null>(null);
     const { photos, addPhoto } = usePhotos();
 
-    // Section Selector State
     const [sections, setSections] = useState<string[]>([]);
     const [selectedSection, setSelectedSection] = useState<string>('');
     const [sectionIdMap, setSectionIdMap] = useState<{ [label: string]: string }>({});
     const [showCustomSectionModal, setShowCustomSectionModal] = useState(false);
     const [customSectionText, setCustomSectionText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const slideAnim = useRef(new Animated.Value(-100)).current;
+    const panResponderRef = useRef<any>(null);
 
     const ITEM_WIDTH = 110;
 
@@ -107,11 +115,61 @@ export default function CameraScreen() {
     }, [selectedUnit]);
 
     React.useEffect(() => {
-        // Trigger haptic feedback when section changes
         if (selectedSection) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
     }, [selectedSection]);
+
+    React.useEffect(() => {
+        if (toast) {
+            panResponderRef.current = PanResponder.create({
+                onStartShouldSetPanResponder: () => true,
+                onMoveShouldSetPanResponder: (_, gestureState) => {
+                    return Math.abs(gestureState.dy) > 5;
+                },
+                onPanResponderMove: (_, gestureState) => {
+                    if (gestureState.dy < 0) {
+                        slideAnim.setValue(gestureState.dy);
+                    }
+                },
+                onPanResponderRelease: (_, gestureState) => {
+                    if (gestureState.dy < -50) {
+                        Animated.timing(slideAnim, {
+                            toValue: -100,
+                            duration: 200,
+                            useNativeDriver: true,
+                        }).start(() => setToast(null));
+                    } else {
+                        Animated.spring(slideAnim, {
+                            toValue: 0,
+                            useNativeDriver: true,
+                        }).start();
+                    }
+                },
+            });
+
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+                tension: 50,
+                friction: 7,
+            }).start();
+
+            const timer = setTimeout(() => {
+                Animated.timing(slideAnim, {
+                    toValue: -100,
+                    duration: 200,
+                    useNativeDriver: true,
+                }).start(() => setToast(null));
+            }, 2000);
+
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
+    const showToast = (message: string, type: 'success' | 'error') => {
+        setToast({ message, type });
+    };
 
     async function fetchProperties() {
         try {
@@ -186,6 +244,123 @@ export default function CameraScreen() {
         }
     }
 
+    async function getOrCreateSession(unitId: string, userId: string) {
+        try {
+            // 1. Check for existing in_progress session (any phase)
+            const { data: existingSession, error: fetchError } = await supabase
+                .from('sessions')
+                .select('id')
+                .eq('unit_id', unitId)
+                .eq('status', 'in_progress')
+                .order('last_activity_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (fetchError && fetchError.code !== 'PGRST116') {
+                throw fetchError;
+            }
+
+            if (existingSession) {
+                await supabase
+                    .from('sessions')
+                    .update({ last_activity_at: new Date().toISOString() })
+                    .eq('id', existingSession.id);
+                return existingSession.id;
+            }
+
+            // 2. Fetch tenancies to determine context
+            const now = new Date().toISOString();
+            const { data: tenancies, error: tenanciesError } = await supabase
+                .from('tenancies')
+                .select('id, lease_start_date, lease_end_date')
+                .eq('unit_id', unitId)
+                .order('lease_start_date', { ascending: true });
+
+            if (tenanciesError) throw tenanciesError;
+
+            let phase = 'move_in';
+            let tenancyId = null;
+
+            const upcomingTenant = tenancies?.find(t => t.lease_start_date > now);
+            // Prior tenant is the latest one that has already started (and potentially ended)
+            const priorTenants = tenancies?.filter(t => t.lease_start_date <= now) || [];
+            const priorTenant = priorTenants[priorTenants.length - 1];
+
+            if (!tenancies || tenancies.length === 0) {
+                // Scenario A: No tenants -> Move-in, no tenancy
+                phase = 'move_in';
+                tenancyId = null;
+            } else if (upcomingTenant && !priorTenant) {
+                // Scenario B: Upcoming tenant, no prior -> Move-in for upcoming
+                phase = 'move_in';
+                tenancyId = upcomingTenant.id;
+            } else if (priorTenant) {
+                // Scenario C: Prior tenant exists
+
+                // Check for completed move_out
+                const { data: moveOut } = await supabase
+                    .from('sessions')
+                    .select('id')
+                    .eq('unit_id', unitId)
+                    .eq('tenancy_id', priorTenant.id)
+                    .eq('phase', 'move_out')
+                    .eq('status', 'completed')
+                    .single();
+
+                if (!moveOut) {
+                    phase = 'move_out';
+                    tenancyId = priorTenant.id;
+                } else {
+                    // Check for completed repair
+                    const { data: repair } = await supabase
+                        .from('sessions')
+                        .select('id')
+                        .eq('unit_id', unitId)
+                        .eq('tenancy_id', priorTenant.id)
+                        .eq('phase', 'repair')
+                        .eq('status', 'completed')
+                        .single();
+
+                    if (!repair) {
+                        phase = 'repair';
+                        tenancyId = priorTenant.id;
+                    } else {
+                        // Both move-outs done
+                        if (upcomingTenant) {
+                            phase = 'move_in';
+                            tenancyId = upcomingTenant.id;
+                        } else {
+                            phase = 'move_in';
+                            tenancyId = null;
+                        }
+                    }
+                }
+            }
+
+            // 3. Create new session with determined phase and tenancy
+            const { data: newSession, error: createError } = await supabase
+                .from('sessions')
+                .insert({
+                    unit_id: unitId,
+                    created_by: userId,
+                    status: 'in_progress',
+                    phase: phase,
+                    tenancy_id: tenancyId,
+                    started_at: new Date().toISOString(),
+                    last_activity_at: new Date().toISOString(),
+                })
+                .select('id')
+                .single();
+
+            if (createError) throw createError;
+            return newSession.id;
+
+        } catch (e) {
+            console.error('Error managing session:', e);
+            throw e;
+        }
+    }
+
     const handleAddCustomSection = async () => {
         if (!customSectionText.trim() || !selectedUnit) return;
 
@@ -204,7 +379,6 @@ export default function CameraScreen() {
 
             if (error) throw error;
 
-            // Add to local state
             setSections([...sections, label]);
             setSectionIdMap({ ...sectionIdMap, [label]: data.id });
             setSelectedSection(label);
@@ -239,7 +413,11 @@ export default function CameraScreen() {
             return;
         }
 
+        // Haptic feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
         setCapturing(true);
+
         try {
             const photo = await cameraRef.current.takePictureAsync({
                 quality: 0.5,
@@ -256,34 +434,34 @@ export default function CameraScreen() {
                 );
                 console.log('Uploaded to Supabase:', storagePath, publicUrl);
 
-                // Store metadata in public.images
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
+                    // Get or create session
+                    const sessionId = await getOrCreateSession(selectedUnit.id, user.id);
                     const sectionId = sectionIdMap[selectedSection];
 
                     const { error: dbError } = await supabase
                         .from('images')
                         .insert({
-                            unit_id: selectedUnit.id,
                             created_by: user.id,
                             path: storagePath,
                             bucket: 'unit-images',
-                            section_name: selectedSection,
                             section_id: sectionId,
-                            taken_at: new Date().toISOString(),
                             mime_type: 'image/jpeg',
                         });
 
                     if (dbError) {
                         console.error('Error saving image metadata:', dbError);
-                        Alert.alert('Error', 'Failed to save image metadata');
+                        showToast('Failed to save image metadata', 'error');
                     } else {
                         console.log('Image metadata saved to database');
+                        showToast('Photo saved!', 'success');
                     }
                 }
             }
         } catch (e) {
             console.error('takePicture error:', e);
+            showToast('Failed to save photo.', 'error');
         } finally {
             setCapturing(false);
         }
@@ -298,6 +476,27 @@ export default function CameraScreen() {
 
     return (
         <View className="flex-1 bg-black">
+            {/* Toast Notification */}
+            {toast && (
+                <SafeAreaView className="absolute top-0 left-0 right-0 z-50" pointerEvents="box-none">
+                    <Animated.View
+                        {...(panResponderRef.current?.panHandlers || {})}
+                        style={{ transform: [{ translateY: slideAnim }] }}
+                        className="mx-4 mt-2"
+                    >
+                        <View className={`px-4 py-3 rounded-xl shadow-lg border-2 ${toast.type === 'success'
+                            ? 'bg-emerald-200 border-emerald-500'
+                            : 'bg-red-200 border-red-500'
+                            }`}>
+                            <Text className={`font-medium text-center ${toast.type === 'success' ? 'text-emerald-600' : 'text-red-600'
+                                }`}>
+                                {toast.message}
+                            </Text>
+                        </View>
+                    </Animated.View>
+                </SafeAreaView>
+            )}
+
             {/* Camera */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
@@ -439,11 +638,7 @@ export default function CameraScreen() {
                 <TouchableOpacity
                     disabled={capturing}
                     onPress={takePicture}
-                    className={
-                        capturing
-                            ? 'opacity-50 w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
-                            : 'w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10'
-                    }
+                    className="w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10"
                 >
                     <View className="w-[67px] h-[67px] rounded-full bg-white" />
                 </TouchableOpacity>
@@ -464,7 +659,7 @@ export default function CameraScreen() {
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     snapToAlignment="start"
-                    snapToInterval={ITEM_WIDTH} // Fixed width for items
+                    snapToInterval={ITEM_WIDTH}
                     decelerationRate="fast"
                     disableIntervalMomentum={true}
                     contentContainerStyle={{ paddingHorizontal: (Dimensions.get('window').width - ITEM_WIDTH) / 2 }}
@@ -473,7 +668,7 @@ export default function CameraScreen() {
                         itemVisiblePercentThreshold: 50
                     }}
                     onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-                        if (tapTargetRef.current) return; // Skip updates during tap animation
+                        if (tapTargetRef.current) return;
 
                         const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
                         const item = [...sections, '+ Custom'][index];
@@ -484,14 +679,12 @@ export default function CameraScreen() {
                     scrollEventThrottle={16}
                     onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
                         if (tapTargetRef.current) {
-                            // Animation from tap completed
                             const target = tapTargetRef.current;
                             tapTargetRef.current = null;
                             if (target !== '+ Custom') {
                                 setSelectedSection(target);
                             }
                         } else {
-                            // Normal swipe
                             const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
                             const item = [...sections, '+ Custom'][index];
                             if (item && item !== '+ Custom') {
@@ -505,18 +698,18 @@ export default function CameraScreen() {
                                 if (item === '+ Custom') {
                                     setShowCustomSectionModal(true);
                                 } else {
-                                    tapTargetRef.current = item; // Store tap target
+                                    tapTargetRef.current = item;
                                     flatListRef.current?.scrollToOffset({ offset: index * ITEM_WIDTH, animated: true });
                                 }
                             }}
-                            style={{ width: ITEM_WIDTH, zIndex: selectedSection === item ? 50 : 1 }} // Fixed width, z-index for overlap
+                            style={{ width: ITEM_WIDTH, zIndex: selectedSection === item ? 50 : 1 }}
                             className="justify-center items-center h-full"
                         >
                             <View
                                 style={{
                                     position: 'absolute',
                                     minWidth: ITEM_WIDTH,
-                                    height: 34, // Fixed height for pill
+                                    height: 34,
                                 }}
                                 className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedSection === item && item !== '+ Custom'
                                     ? 'bg-stone-900/80 border border-white/30'
