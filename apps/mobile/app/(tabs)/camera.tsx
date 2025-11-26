@@ -25,7 +25,8 @@ import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
-import { CameraTopBar } from '../../components/md/CameraTopBar';
+import { CameraTopControls } from '../../components/md/CameraTopControls';
+import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -70,7 +71,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
-    const flatListRef = useRef<FlatList>(null);
     const [capturing, setCapturing] = useState(false);
     const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
     const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
@@ -514,7 +514,7 @@ export default function CameraScreen() {
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
             {/* Top Controls */}
-            <CameraTopBar
+            <CameraTopControls
                 properties={properties}
                 units={units}
                 selectedProperty={selectedProperty}
@@ -524,110 +524,17 @@ export default function CameraScreen() {
                 onSignOut={handleSignOut}
             />
 
-            {/* Capture Button Overlay */}
-            <View className="absolute bottom-0 left-0 right-0 mb-48 items-center z-20" pointerEvents="box-none">
-                <TouchableOpacity
-                    disabled={capturing}
-                    onPress={takePicture}
-                    className="w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10"
-                >
-                    <View className="w-[67px] h-[67px] rounded-full bg-white" />
-                </TouchableOpacity>
-            </View>
-
-            {/* Room Selector */}
-            <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-28">
-                <LinearGradient
-                    colors={['rgba(0,0,0,0.8)', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    className="absolute left-0 top-0 bottom-0 w-16 z-10"
-                    pointerEvents="none"
-                />
-                <FlatList
-                    ref={flatListRef}
-                    data={[...rooms, '+ Custom']}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    snapToAlignment="start"
-                    snapToInterval={ITEM_WIDTH}
-                    decelerationRate="fast"
-                    disableIntervalMomentum={true}
-                    contentContainerStyle={{ paddingHorizontal: (Dimensions.get('window').width - ITEM_WIDTH) / 2 }}
-                    keyExtractor={(item: string) => item}
-                    viewabilityConfig={{
-                        itemVisiblePercentThreshold: 50
-                    }}
-                    onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-                        if (tapTargetRef.current) return;
-
-                        const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
-                        const item = [...rooms, '+ Custom'][index];
-                        if (item && item !== '+ Custom' && item !== selectedRoom) {
-                            setSelectedRoom(item);
-                        }
-                    }}
-                    scrollEventThrottle={16}
-                    onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-                        if (tapTargetRef.current) {
-                            const target = tapTargetRef.current;
-                            tapTargetRef.current = null;
-                            if (target !== '+ Custom') {
-                                setSelectedRoom(target);
-                            }
-                        } else {
-                            const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
-                            const item = [...rooms, '+ Custom'][index];
-                            if (item && item !== '+ Custom') {
-                                setSelectedRoom(item);
-                            }
-                        }
-                    }}
-                    renderItem={({ item, index }: { item: string, index: number }) => (
-                        <TouchableOpacity
-                            onPress={() => {
-                                if (item === '+ Custom') {
-                                    setShowCustomRoomModal(true);
-                                } else {
-                                    tapTargetRef.current = item;
-                                    flatListRef.current?.scrollToOffset({ offset: index * ITEM_WIDTH, animated: true });
-                                }
-                            }}
-                            style={{ width: ITEM_WIDTH, zIndex: selectedRoom === item ? 50 : 1 }}
-                            className="justify-center items-center h-full"
-                        >
-                            <View
-                                style={{
-                                    position: 'absolute',
-                                    minWidth: ITEM_WIDTH,
-                                    height: 34,
-                                }}
-                                className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedRoom === item && item !== '+ Custom'
-                                    ? 'bg-stone-900/80 border border-white/30'
-                                    : ''
-                                    }`}
-                            >
-                                <Text
-                                    numberOfLines={1}
-                                    className={`text-base font-medium ${selectedRoom === item
-                                        ? 'text-white'
-                                        : 'text-white/60'
-                                        }`}
-                                >
-                                    {item}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    )}
-                />
-                <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.8)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    className="absolute right-0 top-0 bottom-0 w-16 z-10"
-                    pointerEvents="none"
-                />
-            </View>
+            {/* Bottom Controls */}
+            <CameraBottomControls
+                rooms={rooms}
+                selectedRoom={selectedRoom}
+                onSelectRoom={setSelectedRoom}
+                onCustomRoom={() => setShowCustomRoomModal(true)}
+                onCapture={takePicture}
+                capturing={capturing}
+                itemWidth={ITEM_WIDTH}
+                tapTargetRef={tapTargetRef}
+            />
 
             {/* Custom Room Modal */}
             <Modal

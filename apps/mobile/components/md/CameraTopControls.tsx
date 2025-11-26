@@ -15,7 +15,7 @@ interface Unit {
     unit_number: string;
 }
 
-interface CameraTopBarProps {
+interface CameraTopControlsProps {
     properties: Property[];
     units: Unit[];
     selectedProperty: Property | null;
@@ -27,7 +27,7 @@ interface CameraTopBarProps {
 
 type OpenMenu = 'property' | 'unit' | 'profile' | null;
 
-export function CameraTopBar({
+export function CameraTopControls({
     properties,
     units,
     selectedProperty,
@@ -35,7 +35,7 @@ export function CameraTopBar({
     onSelectProperty,
     onSelectUnit,
     onSignOut,
-}: CameraTopBarProps) {
+}: CameraTopControlsProps) {
     const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
 
     return (
