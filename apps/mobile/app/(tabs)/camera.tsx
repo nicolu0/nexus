@@ -246,39 +246,106 @@ export default function CameraScreen() {
 
     async function getOrCreateSession(unitId: string, userId: string) {
         try {
-            // 1. Check for existing in_progress session
+            // 1. Check for existing in_progress session (any phase)
             const { data: existingSession, error: fetchError } = await supabase
                 .from('sessions')
                 .select('id')
                 .eq('unit_id', unitId)
                 .eq('status', 'in_progress')
-                .eq('phase', 'move_in')
                 .order('last_activity_at', { ascending: false })
                 .limit(1)
                 .single();
 
-            if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+            if (fetchError && fetchError.code !== 'PGRST116') {
                 throw fetchError;
             }
 
             if (existingSession) {
-                // Update last_activity_at
                 await supabase
                     .from('sessions')
                     .update({ last_activity_at: new Date().toISOString() })
                     .eq('id', existingSession.id);
-
                 return existingSession.id;
             }
 
-            // 2. Create new session if none exists
+            // 2. Fetch tenancies to determine context
+            const now = new Date().toISOString();
+            const { data: tenancies, error: tenanciesError } = await supabase
+                .from('tenancies')
+                .select('id, lease_start_date, lease_end_date')
+                .eq('unit_id', unitId)
+                .order('lease_start_date', { ascending: true });
+
+            if (tenanciesError) throw tenanciesError;
+
+            let phase = 'move_in';
+            let tenancyId = null;
+
+            const upcomingTenant = tenancies?.find(t => t.lease_start_date > now);
+            // Prior tenant is the latest one that has already started (and potentially ended)
+            const priorTenants = tenancies?.filter(t => t.lease_start_date <= now) || [];
+            const priorTenant = priorTenants[priorTenants.length - 1];
+
+            if (!tenancies || tenancies.length === 0) {
+                // Scenario A: No tenants -> Move-in, no tenancy
+                phase = 'move_in';
+                tenancyId = null;
+            } else if (upcomingTenant && !priorTenant) {
+                // Scenario B: Upcoming tenant, no prior -> Move-in for upcoming
+                phase = 'move_in';
+                tenancyId = upcomingTenant.id;
+            } else if (priorTenant) {
+                // Scenario C: Prior tenant exists
+
+                // Check for completed move_out
+                const { data: moveOut } = await supabase
+                    .from('sessions')
+                    .select('id')
+                    .eq('unit_id', unitId)
+                    .eq('tenancy_id', priorTenant.id)
+                    .eq('phase', 'move_out')
+                    .eq('status', 'completed')
+                    .single();
+
+                if (!moveOut) {
+                    phase = 'move_out';
+                    tenancyId = priorTenant.id;
+                } else {
+                    // Check for completed repair
+                    const { data: repair } = await supabase
+                        .from('sessions')
+                        .select('id')
+                        .eq('unit_id', unitId)
+                        .eq('tenancy_id', priorTenant.id)
+                        .eq('phase', 'repair')
+                        .eq('status', 'completed')
+                        .single();
+
+                    if (!repair) {
+                        phase = 'repair';
+                        tenancyId = priorTenant.id;
+                    } else {
+                        // Both move-outs done
+                        if (upcomingTenant) {
+                            phase = 'move_in';
+                            tenancyId = upcomingTenant.id;
+                        } else {
+                            phase = 'move_in';
+                            tenancyId = null;
+                        }
+                    }
+                }
+            }
+
+            // 3. Create new session with determined phase and tenancy
             const { data: newSession, error: createError } = await supabase
                 .from('sessions')
                 .insert({
                     unit_id: unitId,
                     created_by: userId,
                     status: 'in_progress',
-                    phase: 'move_in', // Default phase
+                    phase: phase,
+                    tenancy_id: tenancyId,
                     started_at: new Date().toISOString(),
                     last_activity_at: new Date().toISOString(),
                 })

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 
 type SessionStatus = 'in_progress' | 'completed' | 'abandoned' | string;
@@ -39,10 +40,10 @@ export default function SessionsScreen() {
         switch (phase) {
             case 'move_in':
                 return 'Move-in';
-            case 'move_out_before':
-                return 'Move-out (Pre-repairs)';
-            case 'move_out_after':
-                return 'Move-out (Post-repairs)';
+            case 'move_out':
+                return 'Move-out';
+            case 'repair':
+                return 'Repair';
             default:
                 // Fallback: capitalize + replace underscores
                 return phase
@@ -94,9 +95,11 @@ export default function SessionsScreen() {
         }
     }, []);
 
-    useEffect(() => {
-        loadSessions();
-    }, [loadSessions]);
+    useFocusEffect(
+        useCallback(() => {
+            loadSessions();
+        }, [loadSessions])
+    );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -157,18 +160,18 @@ export default function SessionsScreen() {
 
                     <View
                         className={`px-2 py-0.5 rounded-full ${item.status === 'completed'
-                                ? 'bg-emerald-100'
-                                : item.status === 'abandoned'
-                                    ? 'bg-rose-100'
-                                    : 'bg-amber-100'
+                            ? 'bg-emerald-100'
+                            : item.status === 'abandoned'
+                                ? 'bg-rose-100'
+                                : 'bg-amber-100'
                             }`}
                     >
                         <Text
                             className={`text-[11px] font-semibold ${item.status === 'completed'
-                                    ? 'text-emerald-700'
-                                    : item.status === 'abandoned'
-                                        ? 'text-rose-700'
-                                        : 'text-amber-700'
+                                ? 'text-emerald-700'
+                                : item.status === 'abandoned'
+                                    ? 'text-rose-700'
+                                    : 'text-amber-700'
                                 }`}
                         >
                             {statusLabel(item.status)}
