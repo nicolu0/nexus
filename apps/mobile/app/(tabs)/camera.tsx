@@ -25,6 +25,7 @@ import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
+import { CameraTopBar } from '../../components/md/CameraTopBar';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -71,9 +72,6 @@ export default function CameraScreen() {
     const cameraRef = useRef<CameraView>(null);
     const flatListRef = useRef<FlatList>(null);
     const [capturing, setCapturing] = useState(false);
-    const [showMenu, setShowMenu] = useState(false);
-    const [showPropertyMenu, setShowPropertyMenu] = useState(false);
-    const [showUnitMenu, setShowUnitMenu] = useState(false);
     const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
     const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
     const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string } | null>(null);
@@ -516,137 +514,15 @@ export default function CameraScreen() {
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
             {/* Top Controls */}
-            <SafeAreaView className="absolute top-0 left-0 right-0 z-10" pointerEvents="box-none">
-                <View className="flex-row justify-between px-4 pt-2" pointerEvents="box-none">
-                    {/* Selectors Container (Center) */}
-                    <View className="flex-1 flex-row justify-center items-start gap-2 z-30" pointerEvents="box-none">
-                        {/* Property Selector */}
-                        <View className="relative">
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setShowPropertyMenu(!showPropertyMenu);
-                                    setShowUnitMenu(false);
-                                    setShowMenu(false);
-                                }}
-                                className="flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
-                            >
-                                <Text className="text-white font-medium mr-1 max-w-[120px]" numberOfLines={1}>
-                                    {selectedProperty?.name || 'Select Property'}
-                                </Text>
-                                <Ionicons name="chevron-down" size={16} color="white" />
-                            </TouchableOpacity>
-
-                            {showPropertyMenu && (
-                                <View className="absolute top-full mt-2 left-0 w-full z-40">
-                                    <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
-                                        <ScrollView nestedScrollEnabled>
-                                            {properties.map((prop) => (
-                                                <TouchableOpacity
-                                                    key={prop.id}
-                                                    onPress={() => {
-                                                        setSelectedProperty(prop);
-                                                        setShowPropertyMenu(false);
-                                                    }}
-                                                    className="px-4 py-3 border-b border-white/10 last:border-0"
-                                                >
-                                                    <Text
-                                                        numberOfLines={1}
-                                                        className={`text-base ${selectedProperty?.id === prop.id ? 'font-bold text-white' : 'text-gray-300'}`}
-                                                    >
-                                                        {prop.name}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                            {properties.length === 0 && (
-                                                <View className="px-4 py-3">
-                                                    <Text className="text-gray-400 text-center">No properties found</Text>
-                                                </View>
-                                            )}
-                                        </ScrollView>
-                                    </View>
-                                </View>
-                            )}
-                        </View>
-
-                        {/* Unit Selector */}
-                        <View className="relative">
-                            <TouchableOpacity
-                                onPress={() => {
-                                    if (selectedProperty) {
-                                        setShowUnitMenu(!showUnitMenu);
-                                        setShowPropertyMenu(false);
-                                        setShowMenu(false);
-                                    }
-                                }}
-                                disabled={!selectedProperty}
-                                className={`flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
-                            >
-                                <Text className="text-white font-medium mr-1 max-w-[80px]" numberOfLines={1}>
-                                    {selectedUnit?.unit_number || 'Unit'}
-                                </Text>
-                                <Ionicons name="chevron-down" size={16} color="white" />
-                            </TouchableOpacity>
-
-                            {showUnitMenu && (
-                                <View className="absolute top-full mt-2 left-0 w-full z-40">
-                                    <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
-                                        <ScrollView nestedScrollEnabled>
-                                            {units.map((unit) => (
-                                                <TouchableOpacity
-                                                    key={unit.id}
-                                                    onPress={() => {
-                                                        setSelectedUnit(unit);
-                                                        setShowUnitMenu(false);
-                                                    }}
-                                                    className="px-4 py-3 border-b border-white/10 last:border-0"
-                                                >
-                                                    <Text
-                                                        numberOfLines={1}
-                                                        className={`text-base ${selectedUnit?.id === unit.id ? 'font-bold text-white' : 'text-gray-300'}`}
-                                                    >
-                                                        {unit.unit_number}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                            {units.length === 0 && (
-                                                <View className="px-4 py-3">
-                                                    <Text className="text-gray-400 text-center">No units</Text>
-                                                </View>
-                                            )}
-                                        </ScrollView>
-                                    </View>
-                                </View>
-                            )}
-                        </View>
-                    </View>
-
-                    {/* Profile Menu (Right) */}
-                    <View className="absolute right-4 top-2 z-20">
-                        <TouchableOpacity
-                            onPress={() => {
-                                setShowMenu(!showMenu);
-                                setShowPropertyMenu(false);
-                                setShowUnitMenu(false);
-                            }}
-                            className="w-10 h-10 bg-black/60 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
-                        >
-                            <Ionicons name="person-circle-outline" size={28} color="white" />
-                        </TouchableOpacity>
-
-                        {showMenu && (
-                            <View className="absolute top-12 right-0 bg-white rounded-xl shadow-lg py-2 w-32">
-                                <TouchableOpacity
-                                    onPress={handleSignOut}
-                                    className="px-4 py-2 flex-row items-center"
-                                >
-                                    <Ionicons name="log-out-outline" size={20} color="black" />
-                                    <Text className="ml-2 text-black font-medium">Sign Out</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
-                </View>
-            </SafeAreaView>
+            <CameraTopBar
+                properties={properties}
+                units={units}
+                selectedProperty={selectedProperty}
+                selectedUnit={selectedUnit}
+                onSelectProperty={setSelectedProperty}
+                onSelectUnit={setSelectedUnit}
+                onSignOut={handleSignOut}
+            />
 
             {/* Capture Button Overlay */}
             <View className="absolute bottom-0 left-0 right-0 mb-48 items-center z-20" pointerEvents="box-none">
