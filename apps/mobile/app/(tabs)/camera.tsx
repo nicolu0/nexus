@@ -649,7 +649,7 @@ export default function CameraScreen() {
             </SafeAreaView>
 
             {/* Capture Button Overlay */}
-            <View className="absolute bottom-0 left-0 right-0 mb-20 items-center z-20" pointerEvents="box-none">
+            <View className="absolute bottom-0 left-0 right-0 mb-48 items-center z-20" pointerEvents="box-none">
                 <TouchableOpacity
                     disabled={capturing}
                     onPress={takePicture}
@@ -660,7 +660,7 @@ export default function CameraScreen() {
             </View>
 
             {/* Room Selector */}
-            <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-3">
+            <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-28">
                 <LinearGradient
                     colors={['rgba(0,0,0,0.8)', 'transparent']}
                     start={{ x: 0, y: 0 }}

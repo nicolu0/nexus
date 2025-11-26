@@ -1,55 +1,33 @@
-import { Tabs, useSegments } from 'expo-router';
-import { View, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { NativeTabs, Icon, Label, VectorIcon } from 'expo-router/unstable-native-tabs';
+import { Platform } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function TabLayout() {
-    const segments = useSegments();
-    const currentRoute = segments[segments.length - 1];
-    const isCamera = currentRoute === 'camera' || currentRoute === undefined;
-
     return (
-        <Tabs
-            screenOptions={{
-                headerShown: false,
-                tabBarStyle: {
-                    backgroundColor: isCamera ? '#171717' : 'white', // neutral-900 vs white
-                    borderTopWidth: 1,
-                    borderTopColor: isCamera ? '#262626' : '#eeeeee', // neutral-800 vs neutral-200
-                    height: 95,
-                    paddingBottom: 20,
-                    paddingTop: 12,
-                },
-                tabBarActiveTintColor: isCamera ? 'white' : 'black',
-                tabBarInactiveTintColor: isCamera ? 'white' : 'black',
-            }}
-        >
-            <Tabs.Screen
-                name="dashboard"
-                options={{
-                    title: 'Dashboard',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? "grid" : "grid-outline"} size={22} color={color} />
-                    ),
-                }}
-            />
-            <Tabs.Screen
-                name="camera"
-                options={{
-                    title: 'Camera',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? "camera" : "camera-outline"} size={28} color={color} />
-                    ),
-                }}
-            />
-            <Tabs.Screen
-                name="sessions"
-                options={{
-                    title: 'Sessions',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? "images" : "images-outline"} size={22} color={color} />
-                    ),
-                }}
-            />
-        </Tabs>
+        <NativeTabs>
+            <NativeTabs.Trigger name="dashboard">
+                <Label>Dashboard</Label>
+                {Platform.select({
+                    ios: <Icon sf="square.grid.2x2.fill" />,
+                    android: <Icon src={<VectorIcon family={Ionicons} name="grid" />} />,
+                })}
+            </NativeTabs.Trigger>
+
+            <NativeTabs.Trigger name="camera">
+                <Label>Camera</Label>
+                {Platform.select({
+                    ios: <Icon sf="camera.fill" />,
+                    android: <Icon src={<VectorIcon family={Ionicons} name="camera" />} />,
+                })}
+            </NativeTabs.Trigger>
+
+            <NativeTabs.Trigger name="sessions">
+                <Label>Sessions</Label>
+                {Platform.select({
+                    ios: <Icon sf="photo.stack.fill" />,
+                    android: <Icon src={<VectorIcon family={Ionicons} name="images" />} />,
+                })}
+            </NativeTabs.Trigger>
+        </NativeTabs>
     );
 }
