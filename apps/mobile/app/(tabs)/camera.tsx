@@ -80,11 +80,11 @@ export default function CameraScreen() {
     const [selectedUnit, setSelectedUnit] = useState<{ id: string; unit_number: string } | null>(null);
     const { photos, addPhoto } = usePhotos();
 
-    const [sections, setSections] = useState<string[]>([]);
-    const [selectedSection, setSelectedSection] = useState<string>('');
-    const [sectionIdMap, setSectionIdMap] = useState<{ [label: string]: string }>({});
-    const [showCustomSectionModal, setShowCustomSectionModal] = useState(false);
-    const [customSectionText, setCustomSectionText] = useState('');
+    const [rooms, setRooms] = useState<string[]>([]);
+    const [selectedRoom, setSelectedRoom] = useState<string>('');
+    const [roomIdMap, setRoomIdMap] = useState<{ [label: string]: string }>({});
+    const [showCustomRoomModal, setShowCustomRoomModal] = useState(false);
+    const [customRoomText, setCustomRoomText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const slideAnim = useRef(new Animated.Value(-100)).current;
@@ -107,18 +107,18 @@ export default function CameraScreen() {
 
     React.useEffect(() => {
         if (selectedUnit) {
-            fetchUnitSections(selectedUnit.id);
+            fetchUnitRooms(selectedUnit.id);
         } else {
-            setSections([]);
-            setSelectedSection('');
+            setRooms([]);
+            setSelectedRoom('');
         }
     }, [selectedUnit]);
 
     React.useEffect(() => {
-        if (selectedSection) {
+        if (selectedRoom) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
-    }, [selectedSection]);
+    }, [selectedRoom]);
 
     React.useEffect(() => {
         if (toast) {
@@ -179,7 +179,7 @@ export default function CameraScreen() {
             const { data, error } = await supabase
                 .from('properties')
                 .select('id, name')
-                .eq('user_id', user.id)
+                .eq('owner_id', user.id)
                 .order('name');
 
             if (error) throw error;
@@ -214,33 +214,33 @@ export default function CameraScreen() {
         }
     }
 
-    async function fetchUnitSections(unitId: string) {
+    async function fetchUnitRooms(unitId: string) {
         try {
             const { data, error } = await supabase
-                .from('unit_sections')
-                .select('id, label')
+                .from('rooms')
+                .select('id, name')
                 .eq('unit_id', unitId)
-                .order('label');
+                .order('name');
 
             if (error) throw error;
 
             if (data && data.length > 0) {
-                const sectionLabels = data.map(s => s.label);
+                const roomLabels = data.map(s => s.name);
                 const idMap = data.reduce((acc, s) => {
-                    acc[s.label] = s.id;
+                    acc[s.name] = s.id;
                     return acc;
                 }, {} as { [label: string]: string });
 
-                setSections(sectionLabels);
-                setSectionIdMap(idMap);
-                setSelectedSection(sectionLabels[0]);
+                setRooms(roomLabels);
+                setRoomIdMap(idMap);
+                setSelectedRoom(roomLabels[0]);
             } else {
-                setSections([]);
-                setSectionIdMap({});
-                setSelectedSection('');
+                setRooms([]);
+                setRoomIdMap({});
+                setSelectedRoom('');
             }
         } catch (e) {
-            console.error('Error fetching unit sections:', e);
+            console.error('Error fetching unit rooms:', e);
         }
     }
 
@@ -265,7 +265,19 @@ export default function CameraScreen() {
                     .from('sessions')
                     .update({ last_activity_at: new Date().toISOString() })
                     .eq('id', existingSession.id);
-                return existingSession.id;
+
+                // Fetch full session details to return
+                const { data: fullSession } = await supabase
+                    .from('sessions')
+                    .select('tenancy_id, phase')
+                    .eq('id', existingSession.id)
+                    .single();
+
+                return {
+                    sessionId: existingSession.id,
+                    tenancyId: fullSession?.tenancy_id,
+                    phase: fullSession?.phase
+                };
             }
 
             // 2. Fetch tenancies to determine context
@@ -353,7 +365,11 @@ export default function CameraScreen() {
                 .single();
 
             if (createError) throw createError;
-            return newSession.id;
+            return {
+                sessionId: newSession.id,
+                tenancyId: tenancyId,
+                phase: phase
+            };
 
         } catch (e) {
             console.error('Error managing session:', e);
@@ -361,32 +377,31 @@ export default function CameraScreen() {
         }
     }
 
-    const handleAddCustomSection = async () => {
-        if (!customSectionText.trim() || !selectedUnit) return;
+    const handleAddCustomRoom = async () => {
+        if (!customRoomText.trim() || !selectedUnit) return;
 
-        const label = customSectionText.trim().charAt(0).toUpperCase() + customSectionText.trim().slice(1);
+        const label = customRoomText.trim().charAt(0).toUpperCase() + customRoomText.trim().slice(1);
 
         try {
             const { data, error } = await supabase
-                .from('unit_sections')
+                .from('rooms')
                 .insert({
                     unit_id: selectedUnit.id,
-                    label: label,
-                    kind: 'custom'
+                    name: label,
                 })
-                .select('id, label')
+                .select('id, name')
                 .single();
 
             if (error) throw error;
 
-            setSections([...sections, label]);
-            setSectionIdMap({ ...sectionIdMap, [label]: data.id });
-            setSelectedSection(label);
-            setCustomSectionText('');
-            setShowCustomSectionModal(false);
+            setRooms([...rooms, label]);
+            setRoomIdMap({ ...roomIdMap, [label]: data.id });
+            setSelectedRoom(label);
+            setCustomRoomText('');
+            setShowCustomRoomModal(false);
         } catch (e) {
-            console.error('Error adding custom section:', e);
-            Alert.alert('Error', 'Failed to add custom section');
+            console.error('Error adding custom room:', e);
+            Alert.alert('Error', 'Failed to add custom room');
         }
     };
 
@@ -437,16 +452,16 @@ export default function CameraScreen() {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
                     // Get or create session
-                    const sessionId = await getOrCreateSession(selectedUnit.id, user.id);
-                    const sectionId = sectionIdMap[selectedSection];
+                    const { sessionId, tenancyId, phase } = await getOrCreateSession(selectedUnit.id, user.id);
+                    const roomId = roomIdMap[selectedRoom];
 
                     const { error: dbError } = await supabase
                         .from('images')
                         .insert({
-                            created_by: user.id,
                             path: storagePath,
-                            bucket: 'unit-images',
-                            section_id: sectionId,
+                            room_id: roomId,
+                            tenancy_id: tenancyId,
+                            phase: phase,
                             mime_type: 'image/jpeg',
                         });
 
@@ -644,7 +659,7 @@ export default function CameraScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Section Selector */}
+            {/* Room Selector */}
             <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-3">
                 <LinearGradient
                     colors={['rgba(0,0,0,0.8)', 'transparent']}
@@ -655,7 +670,7 @@ export default function CameraScreen() {
                 />
                 <FlatList
                     ref={flatListRef}
-                    data={[...sections, '+ Custom']}
+                    data={[...rooms, '+ Custom']}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     snapToAlignment="start"
@@ -671,9 +686,9 @@ export default function CameraScreen() {
                         if (tapTargetRef.current) return;
 
                         const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
-                        const item = [...sections, '+ Custom'][index];
-                        if (item && item !== '+ Custom' && item !== selectedSection) {
-                            setSelectedSection(item);
+                        const item = [...rooms, '+ Custom'][index];
+                        if (item && item !== '+ Custom' && item !== selectedRoom) {
+                            setSelectedRoom(item);
                         }
                     }}
                     scrollEventThrottle={16}
@@ -682,13 +697,13 @@ export default function CameraScreen() {
                             const target = tapTargetRef.current;
                             tapTargetRef.current = null;
                             if (target !== '+ Custom') {
-                                setSelectedSection(target);
+                                setSelectedRoom(target);
                             }
                         } else {
                             const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
-                            const item = [...sections, '+ Custom'][index];
+                            const item = [...rooms, '+ Custom'][index];
                             if (item && item !== '+ Custom') {
-                                setSelectedSection(item);
+                                setSelectedRoom(item);
                             }
                         }
                     }}
@@ -696,13 +711,13 @@ export default function CameraScreen() {
                         <TouchableOpacity
                             onPress={() => {
                                 if (item === '+ Custom') {
-                                    setShowCustomSectionModal(true);
+                                    setShowCustomRoomModal(true);
                                 } else {
                                     tapTargetRef.current = item;
                                     flatListRef.current?.scrollToOffset({ offset: index * ITEM_WIDTH, animated: true });
                                 }
                             }}
-                            style={{ width: ITEM_WIDTH, zIndex: selectedSection === item ? 50 : 1 }}
+                            style={{ width: ITEM_WIDTH, zIndex: selectedRoom === item ? 50 : 1 }}
                             className="justify-center items-center h-full"
                         >
                             <View
@@ -711,14 +726,14 @@ export default function CameraScreen() {
                                     minWidth: ITEM_WIDTH,
                                     height: 34,
                                 }}
-                                className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedSection === item && item !== '+ Custom'
+                                className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedRoom === item && item !== '+ Custom'
                                     ? 'bg-stone-900/80 border border-white/30'
                                     : ''
                                     }`}
                             >
                                 <Text
                                     numberOfLines={1}
-                                    className={`text-base font-medium ${selectedSection === item
+                                    className={`text-base font-medium ${selectedRoom === item
                                         ? 'text-white'
                                         : 'text-white/60'
                                         }`}
@@ -738,36 +753,36 @@ export default function CameraScreen() {
                 />
             </View>
 
-            {/* Custom Section Modal */}
+            {/* Custom Room Modal */}
             <Modal
-                visible={showCustomSectionModal}
+                visible={showCustomRoomModal}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setShowCustomSectionModal(false)}
+                onRequestClose={() => setShowCustomRoomModal(false)}
             >
                 <View className="flex-1 bg-black/80 justify-center items-center px-6">
                     <View className="bg-stone-900 w-full rounded-2xl p-6 border border-white/10">
-                        <Text className="text-white text-xl font-bold mb-4">Add Custom Section</Text>
+                        <Text className="text-white text-xl font-bold mb-4">Add Custom Room</Text>
                         <TextInput
                             className="bg-stone-800 text-white p-4 rounded-xl mb-4 text-lg"
-                            placeholder="Section Name"
+                            placeholder="Room Name"
                             placeholderTextColor="#666"
-                            value={customSectionText}
-                            onChangeText={setCustomSectionText}
+                            value={customRoomText}
+                            onChangeText={setCustomRoomText}
                             autoFocus
                         />
                         <View className="flex-row gap-4">
                             <TouchableOpacity
-                                onPress={() => setShowCustomSectionModal(false)}
+                                onPress={() => setShowCustomRoomModal(false)}
                                 className="flex-1 bg-stone-800 p-4 rounded-xl items-center"
                             >
                                 <Text className="text-white font-semibold">Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                onPress={handleAddCustomSection}
+                                onPress={handleAddCustomRoom}
                                 className="flex-1 bg-white p-4 rounded-xl items-center"
                             >
-                                <Text className="text-black font-semibold">Add</Text>
+                                <Text className="text-black font-semibold">Add Room</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
