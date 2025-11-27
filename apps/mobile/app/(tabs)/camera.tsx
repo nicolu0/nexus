@@ -375,6 +375,12 @@ export default function CameraScreen() {
     const handleAddCustomRoom = async () => {
         if (!customRoomText.trim() || !selectedUnit) return;
 
+        const normalizedNewRoom = customRoomText.trim().toLowerCase();
+        if (rooms.some(r => r.toLowerCase() === normalizedNewRoom)) {
+            showToast('Room already exists!', 'error');
+            return;
+        }
+
         const label = customRoomText.trim().charAt(0).toUpperCase() + customRoomText.trim().slice(1);
 
         try {
@@ -486,15 +492,6 @@ export default function CameraScreen() {
 
     return (
         <View className="flex-1 bg-black">
-            {/* Toast Notification */}
-            {toast && (
-                <ToastNotification
-                    message={toast.message}
-                    type={toast.type}
-                    onDismiss={() => setToast(null)}
-                />
-            )}
-
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
             <CameraTopControls
@@ -526,6 +523,15 @@ export default function CameraScreen() {
                 onCancel={() => setShowCustomRoomModal(false)}
                 onSubmit={handleAddCustomRoom}
             />
+
+            {/* Toast Notification */}
+            {toast && (
+                <ToastNotification
+                    message={toast.message}
+                    type={toast.type}
+                    onDismiss={() => setToast(null)}
+                />
+            )}
         </View >
     );
 }

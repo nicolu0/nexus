@@ -23,7 +23,7 @@ export function CustomRoomModal({
             animationType="fade"
             onRequestClose={onCancel}
         >
-            <View className="flex-1 bg-black/80 justify-center items-center px-6 pb-10">
+            <View className="flex-1 bg-black/80 justify-center items-center px-6 pb-10 z-10">
                 <View className="bg-stone-900 w-full rounded-2xl p-6 border border-white/10">
                     <Text className="text-white text-xl mb-4 font-semibold">Add Custom Room</Text>
                     <TextInput

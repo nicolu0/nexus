@@ -1,10 +1,14 @@
 import { NativeTabs, Icon, Label, VectorIcon } from 'expo-router/unstable-native-tabs';
-import { Platform } from 'react-native';
+import { DynamicColorIOS, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function TabLayout() {
     return (
-        <NativeTabs>
+        <NativeTabs 
+            tintColor={DynamicColorIOS({
+                dark: 'slateblue',
+                light: 'slateblue',
+            })}>
             <NativeTabs.Trigger name="dashboard">
                 <Label>Dashboard</Label>
                 {Platform.select({
