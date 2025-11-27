@@ -15,6 +15,7 @@ import { CameraTopControls, CameraTopControlsHandle } from '../../components/md/
 import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 import { ToastNotification } from '../../components/sm/ToastNotification';
+import * as Location from 'expo-location';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -57,9 +58,9 @@ export default function CameraScreen() {
     const cameraRef = useRef<CameraView>(null);
     const topControlsRef = useRef<CameraTopControlsHandle>(null);
     const [capturing, setCapturing] = useState(false);
-    const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+    const [properties, setProperties] = useState<{ id: string; name: string; latitude?: number; longitude?: number }[]>([]);
     const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
-    const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string } | null>(null);
+    const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string; latitude?: number; longitude?: number } | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<{ id: string; unit_number: string } | null>(null);
     const { photos, addPhoto } = usePhotos();
 
@@ -118,7 +119,7 @@ export default function CameraScreen() {
 
             const { data, error } = await supabase
                 .from('properties')
-                .select('id, name')
+                .select('id, name, latitude, longitude')
                 .eq('owner_id', user.id)
                 .order('name');
 
@@ -126,13 +127,67 @@ export default function CameraScreen() {
 
             if (data) {
                 setProperties(data);
-                if (data.length > 0) {
-                    setSelectedProperty(data[0]);
+
+                // Try to find closest property
+                try {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        const location = await Location.getCurrentPositionAsync({});
+                        const { latitude, longitude } = location.coords;
+
+                        let closestProperty = null;
+                        let minDistance = Infinity;
+
+                        data.forEach(property => {
+                            if (property.latitude && property.longitude) {
+                                const distance = getDistanceFromLatLonInKm(
+                                    latitude,
+                                    longitude,
+                                    property.latitude,
+                                    property.longitude
+                                );
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    closestProperty = property;
+                                }
+                            }
+                        });
+
+                        if (closestProperty) {
+                            setSelectedProperty(closestProperty);
+                        } else {
+                            setSelectedProperty(null);
+                        }
+                    } else {
+                        // Fallback if permission denied
+                        setSelectedProperty(null);
+                    }
+                } catch (locError) {
+                    console.error('Error getting location:', locError);
+                    setSelectedProperty(null);
                 }
             }
         } catch (e) {
             console.error('Error fetching properties:', e);
         }
+    }
+
+    function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+        var R = 6371; // Radius of the earth in km
+        var dLat = deg2rad(lat2 - lat1);
+        var dLon = deg2rad(lon2 - lon1);
+        var a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+            ;
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        var d = R * c; // Distance in km
+        return d;
+    }
+
+    function deg2rad(deg: number) {
+        return deg * (Math.PI / 180);
     }
 
     async function fetchUnits(propertyId: string) {

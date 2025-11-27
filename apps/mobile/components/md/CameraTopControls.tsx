@@ -9,6 +9,8 @@ import { ProfileMenu } from '../sm/ProfileMenu';
 interface Property {
     id: string;
     name: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 interface Unit {
