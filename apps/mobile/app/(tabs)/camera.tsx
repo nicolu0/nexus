@@ -1,41 +1,30 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
     View,
     Text,
-    TouchableOpacity,
     Button,
-    ScrollView,
-    Image,
     StyleSheet,
     Alert,
-    Modal,
-    TextInput,
-    FlatList,
-    Dimensions,
-    NativeSyntheticEvent,
-    NativeScrollEvent,
-    ViewToken,
-    Animated,
-    PanResponder,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
+import { CameraTopControls, CameraTopControlsHandle } from '../../components/md/CameraTopControls';
+import { CameraBottomControls } from '../../components/md/CameraBottomControls';
+import { CustomRoomModal } from '../../components/md/CustomRoomModal';
+import { ToastNotification } from '../../components/sm/ToastNotification';
+import * as Location from 'expo-location';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
     const filename = `${Date.now()}.${ext}`;
     const path = `raw/${filename}`;
 
-    // Use new File API
     const file = new FileSystem.File(uri);
     const base64 = await file.base64();
 
-    // Decode base64 to binary
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -64,31 +53,30 @@ async function uploadPhotoToSupabase(uri: string) {
     };
 }
 
-import { LinearGradient } from 'expo-linear-gradient';
-
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
-    const flatListRef = useRef<FlatList>(null);
+    const topControlsRef = useRef<CameraTopControlsHandle>(null);
     const [capturing, setCapturing] = useState(false);
-    const [showMenu, setShowMenu] = useState(false);
-    const [showPropertyMenu, setShowPropertyMenu] = useState(false);
-    const [showUnitMenu, setShowUnitMenu] = useState(false);
-    const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+    const [properties, setProperties] = useState<{ id: string; name: string; latitude?: number; longitude?: number }[]>([]);
     const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
-    const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string } | null>(null);
+    const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string; latitude?: number; longitude?: number } | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<{ id: string; unit_number: string } | null>(null);
     const { photos, addPhoto } = usePhotos();
 
-    const [sections, setSections] = useState<string[]>([]);
-    const [selectedSection, setSelectedSection] = useState<string>('');
-    const [sectionIdMap, setSectionIdMap] = useState<{ [label: string]: string }>({});
-    const [showCustomSectionModal, setShowCustomSectionModal] = useState(false);
-    const [customSectionText, setCustomSectionText] = useState('');
+    const [rooms, setRooms] = useState<string[]>([]);
+    const [selectedRoom, setSelectedRoom] = useState<string>('');
+    const [roomIdMap, setRoomIdMap] = useState<{ [label: string]: string }>({});
+    const [showCustomRoomModal, setShowCustomRoomModal] = useState(false);
+    const [customRoomText, setCustomRoomText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const slideAnim = useRef(new Animated.Value(-100)).current;
-    const panResponderRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (showCustomRoomModal) {
+            topControlsRef.current?.closeDropdowns();
+        }
+    }, [showCustomRoomModal]);
 
     const ITEM_WIDTH = 110;
 
@@ -107,65 +95,18 @@ export default function CameraScreen() {
 
     React.useEffect(() => {
         if (selectedUnit) {
-            fetchUnitSections(selectedUnit.id);
+            fetchUnitRooms(selectedUnit.id);
         } else {
-            setSections([]);
-            setSelectedSection('');
+            setRooms([]);
+            setSelectedRoom('');
         }
     }, [selectedUnit]);
 
     React.useEffect(() => {
-        if (selectedSection) {
+        if (selectedRoom) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
-    }, [selectedSection]);
-
-    React.useEffect(() => {
-        if (toast) {
-            panResponderRef.current = PanResponder.create({
-                onStartShouldSetPanResponder: () => true,
-                onMoveShouldSetPanResponder: (_, gestureState) => {
-                    return Math.abs(gestureState.dy) > 5;
-                },
-                onPanResponderMove: (_, gestureState) => {
-                    if (gestureState.dy < 0) {
-                        slideAnim.setValue(gestureState.dy);
-                    }
-                },
-                onPanResponderRelease: (_, gestureState) => {
-                    if (gestureState.dy < -50) {
-                        Animated.timing(slideAnim, {
-                            toValue: -100,
-                            duration: 200,
-                            useNativeDriver: true,
-                        }).start(() => setToast(null));
-                    } else {
-                        Animated.spring(slideAnim, {
-                            toValue: 0,
-                            useNativeDriver: true,
-                        }).start();
-                    }
-                },
-            });
-
-            Animated.spring(slideAnim, {
-                toValue: 0,
-                useNativeDriver: true,
-                tension: 50,
-                friction: 7,
-            }).start();
-
-            const timer = setTimeout(() => {
-                Animated.timing(slideAnim, {
-                    toValue: -100,
-                    duration: 200,
-                    useNativeDriver: true,
-                }).start(() => setToast(null));
-            }, 2000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [toast]);
+    }, [selectedRoom]);
 
     const showToast = (message: string, type: 'success' | 'error') => {
         setToast({ message, type });
@@ -178,21 +119,75 @@ export default function CameraScreen() {
 
             const { data, error } = await supabase
                 .from('properties')
-                .select('id, name')
-                .eq('user_id', user.id)
+                .select('id, name, latitude, longitude')
+                .eq('owner_id', user.id)
                 .order('name');
 
             if (error) throw error;
 
             if (data) {
                 setProperties(data);
-                if (data.length > 0) {
-                    setSelectedProperty(data[0]);
+
+                // Try to find closest property
+                try {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        const location = await Location.getCurrentPositionAsync({});
+                        const { latitude, longitude } = location.coords;
+
+                        let closestProperty = null;
+                        let minDistance = Infinity;
+
+                        data.forEach(property => {
+                            if (property.latitude && property.longitude) {
+                                const distance = getDistanceFromLatLonInKm(
+                                    latitude,
+                                    longitude,
+                                    property.latitude,
+                                    property.longitude
+                                );
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    closestProperty = property;
+                                }
+                            }
+                        });
+
+                        if (closestProperty) {
+                            setSelectedProperty(closestProperty);
+                        } else {
+                            setSelectedProperty(null);
+                        }
+                    } else {
+                        // Fallback if permission denied
+                        setSelectedProperty(null);
+                    }
+                } catch (locError) {
+                    console.error('Error getting location:', locError);
+                    setSelectedProperty(null);
                 }
             }
         } catch (e) {
             console.error('Error fetching properties:', e);
         }
+    }
+
+    function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+        var R = 6371; // Radius of the earth in km
+        var dLat = deg2rad(lat2 - lat1);
+        var dLon = deg2rad(lon2 - lon1);
+        var a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+            ;
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        var d = R * c; // Distance in km
+        return d;
+    }
+
+    function deg2rad(deg: number) {
+        return deg * (Math.PI / 180);
     }
 
     async function fetchUnits(propertyId: string) {
@@ -214,33 +209,33 @@ export default function CameraScreen() {
         }
     }
 
-    async function fetchUnitSections(unitId: string) {
+    async function fetchUnitRooms(unitId: string) {
         try {
             const { data, error } = await supabase
-                .from('unit_sections')
-                .select('id, label')
+                .from('rooms')
+                .select('id, name')
                 .eq('unit_id', unitId)
-                .order('label');
+                .order('name');
 
             if (error) throw error;
 
             if (data && data.length > 0) {
-                const sectionLabels = data.map(s => s.label);
+                const roomLabels = data.map(s => s.name);
                 const idMap = data.reduce((acc, s) => {
-                    acc[s.label] = s.id;
+                    acc[s.name] = s.id;
                     return acc;
                 }, {} as { [label: string]: string });
 
-                setSections(sectionLabels);
-                setSectionIdMap(idMap);
-                setSelectedSection(sectionLabels[0]);
+                setRooms(roomLabels);
+                setRoomIdMap(idMap);
+                setSelectedRoom(roomLabels[0]);
             } else {
-                setSections([]);
-                setSectionIdMap({});
-                setSelectedSection('');
+                setRooms([]);
+                setRoomIdMap({});
+                setSelectedRoom('');
             }
         } catch (e) {
-            console.error('Error fetching unit sections:', e);
+            console.error('Error fetching unit rooms:', e);
         }
     }
 
@@ -265,7 +260,19 @@ export default function CameraScreen() {
                     .from('sessions')
                     .update({ last_activity_at: new Date().toISOString() })
                     .eq('id', existingSession.id);
-                return existingSession.id;
+
+                // Fetch full session details to return
+                const { data: fullSession } = await supabase
+                    .from('sessions')
+                    .select('tenancy_id, phase')
+                    .eq('id', existingSession.id)
+                    .single();
+
+                return {
+                    sessionId: existingSession.id,
+                    tenancyId: fullSession?.tenancy_id,
+                    phase: fullSession?.phase
+                };
             }
 
             // 2. Fetch tenancies to determine context
@@ -353,7 +360,11 @@ export default function CameraScreen() {
                 .single();
 
             if (createError) throw createError;
-            return newSession.id;
+            return {
+                sessionId: newSession.id,
+                tenancyId: tenancyId,
+                phase: phase
+            };
 
         } catch (e) {
             console.error('Error managing session:', e);
@@ -361,32 +372,37 @@ export default function CameraScreen() {
         }
     }
 
-    const handleAddCustomSection = async () => {
-        if (!customSectionText.trim() || !selectedUnit) return;
+    const handleAddCustomRoom = async () => {
+        if (!customRoomText.trim() || !selectedUnit) return;
 
-        const label = customSectionText.trim().charAt(0).toUpperCase() + customSectionText.trim().slice(1);
+        const normalizedNewRoom = customRoomText.trim().toLowerCase();
+        if (rooms.some(r => r.toLowerCase() === normalizedNewRoom)) {
+            showToast('Room already exists!', 'error');
+            return;
+        }
+
+        const label = customRoomText.trim().charAt(0).toUpperCase() + customRoomText.trim().slice(1);
 
         try {
             const { data, error } = await supabase
-                .from('unit_sections')
+                .from('rooms')
                 .insert({
                     unit_id: selectedUnit.id,
-                    label: label,
-                    kind: 'custom'
+                    name: label,
                 })
-                .select('id, label')
+                .select('id, name')
                 .single();
 
             if (error) throw error;
 
-            setSections([...sections, label]);
-            setSectionIdMap({ ...sectionIdMap, [label]: data.id });
-            setSelectedSection(label);
-            setCustomSectionText('');
-            setShowCustomSectionModal(false);
+            setRooms([...rooms, label]);
+            setRoomIdMap({ ...roomIdMap, [label]: data.id });
+            setSelectedRoom(label);
+            setCustomRoomText('');
+            setShowCustomRoomModal(false);
         } catch (e) {
-            console.error('Error adding custom section:', e);
-            Alert.alert('Error', 'Failed to add custom section');
+            console.error('Error adding custom room:', e);
+            Alert.alert('Error', 'Failed to add custom room');
         }
     };
 
@@ -437,16 +453,16 @@ export default function CameraScreen() {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
                     // Get or create session
-                    const sessionId = await getOrCreateSession(selectedUnit.id, user.id);
-                    const sectionId = sectionIdMap[selectedSection];
+                    const { sessionId, tenancyId, phase } = await getOrCreateSession(selectedUnit.id, user.id);
+                    const roomId = roomIdMap[selectedRoom];
 
                     const { error: dbError } = await supabase
                         .from('images')
                         .insert({
-                            created_by: user.id,
                             path: storagePath,
-                            bucket: 'unit-images',
-                            section_id: sectionId,
+                            room_id: roomId,
+                            tenancy_id: tenancyId,
+                            phase: phase,
                             mime_type: 'image/jpeg',
                         });
 
@@ -476,303 +492,46 @@ export default function CameraScreen() {
 
     return (
         <View className="flex-1 bg-black">
-            {/* Toast Notification */}
-            {toast && (
-                <SafeAreaView className="absolute top-0 left-0 right-0 z-50" pointerEvents="box-none">
-                    <Animated.View
-                        {...(panResponderRef.current?.panHandlers || {})}
-                        style={{ transform: [{ translateY: slideAnim }] }}
-                        className="mx-4 mt-2"
-                    >
-                        <View className={`px-4 py-3 rounded-xl shadow-lg border-2 ${toast.type === 'success'
-                            ? 'bg-emerald-200 border-emerald-500'
-                            : 'bg-red-200 border-red-500'
-                            }`}>
-                            <Text className={`font-medium text-center ${toast.type === 'success' ? 'text-emerald-600' : 'text-red-600'
-                                }`}>
-                                {toast.message}
-                            </Text>
-                        </View>
-                    </Animated.View>
-                </SafeAreaView>
-            )}
-
-            {/* Camera */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
-            {/* Top Controls */}
-            <SafeAreaView className="absolute top-0 left-0 right-0 z-10" pointerEvents="box-none">
-                <View className="flex-row justify-between px-4 pt-2" pointerEvents="box-none">
-                    {/* Selectors Container (Center) */}
-                    <View className="flex-1 flex-row justify-center items-start gap-2 z-30" pointerEvents="box-none">
-                        {/* Property Selector */}
-                        <View className="relative">
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setShowPropertyMenu(!showPropertyMenu);
-                                    setShowUnitMenu(false);
-                                    setShowMenu(false);
-                                }}
-                                className="flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20"
-                            >
-                                <Text className="text-white font-medium mr-1 max-w-[120px]" numberOfLines={1}>
-                                    {selectedProperty?.name || 'Select Property'}
-                                </Text>
-                                <Ionicons name="chevron-down" size={16} color="white" />
-                            </TouchableOpacity>
+            <CameraTopControls
+                ref={topControlsRef}
+                properties={properties}
+                units={units}
+                selectedProperty={selectedProperty}
+                selectedUnit={selectedUnit}
+                onSelectProperty={setSelectedProperty}
+                onSelectUnit={setSelectedUnit}
+                onSignOut={handleSignOut}
+            />
 
-                            {showPropertyMenu && (
-                                <View className="absolute top-full mt-2 left-0 w-full z-40">
-                                    <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
-                                        <ScrollView nestedScrollEnabled>
-                                            {properties.map((prop) => (
-                                                <TouchableOpacity
-                                                    key={prop.id}
-                                                    onPress={() => {
-                                                        setSelectedProperty(prop);
-                                                        setShowPropertyMenu(false);
-                                                    }}
-                                                    className="px-4 py-3 border-b border-white/10 last:border-0"
-                                                >
-                                                    <Text
-                                                        numberOfLines={1}
-                                                        className={`text-base ${selectedProperty?.id === prop.id ? 'font-bold text-white' : 'text-gray-300'}`}
-                                                    >
-                                                        {prop.name}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                            {properties.length === 0 && (
-                                                <View className="px-4 py-3">
-                                                    <Text className="text-gray-400 text-center">No properties found</Text>
-                                                </View>
-                                            )}
-                                        </ScrollView>
-                                    </View>
-                                </View>
-                            )}
-                        </View>
+            <CameraBottomControls
+                rooms={rooms}
+                selectedRoom={selectedRoom}
+                onSelectRoom={setSelectedRoom}
+                onCustomRoom={() => setShowCustomRoomModal(true)}
+                onCapture={takePicture}
+                capturing={capturing}
+                itemWidth={ITEM_WIDTH}
+                tapTargetRef={tapTargetRef}
+            />
 
-                        {/* Unit Selector */}
-                        <View className="relative">
-                            <TouchableOpacity
-                                onPress={() => {
-                                    if (selectedProperty) {
-                                        setShowUnitMenu(!showUnitMenu);
-                                        setShowPropertyMenu(false);
-                                        setShowMenu(false);
-                                    }
-                                }}
-                                disabled={!selectedProperty}
-                                className={`flex-row items-center bg-stone-900/80 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 ${!selectedProperty ? 'opacity-50' : ''}`}
-                            >
-                                <Text className="text-white font-medium mr-1 max-w-[80px]" numberOfLines={1}>
-                                    {selectedUnit?.unit_number || 'Unit'}
-                                </Text>
-                                <Ionicons name="chevron-down" size={16} color="white" />
-                            </TouchableOpacity>
+            <CustomRoomModal
+                visible={showCustomRoomModal}
+                roomText={customRoomText}
+                onChangeText={setCustomRoomText}
+                onCancel={() => setShowCustomRoomModal(false)}
+                onSubmit={handleAddCustomRoom}
+            />
 
-                            {showUnitMenu && (
-                                <View className="absolute top-full mt-2 left-0 w-full z-40">
-                                    <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full max-h-60">
-                                        <ScrollView nestedScrollEnabled>
-                                            {units.map((unit) => (
-                                                <TouchableOpacity
-                                                    key={unit.id}
-                                                    onPress={() => {
-                                                        setSelectedUnit(unit);
-                                                        setShowUnitMenu(false);
-                                                    }}
-                                                    className="px-4 py-3 border-b border-white/10 last:border-0"
-                                                >
-                                                    <Text
-                                                        numberOfLines={1}
-                                                        className={`text-base ${selectedUnit?.id === unit.id ? 'font-bold text-white' : 'text-gray-300'}`}
-                                                    >
-                                                        {unit.unit_number}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                            {units.length === 0 && (
-                                                <View className="px-4 py-3">
-                                                    <Text className="text-gray-400 text-center">No units</Text>
-                                                </View>
-                                            )}
-                                        </ScrollView>
-                                    </View>
-                                </View>
-                            )}
-                        </View>
-                    </View>
-
-                    {/* Profile Menu (Right) */}
-                    <View className="absolute right-4 top-2 z-20">
-                        <TouchableOpacity
-                            onPress={() => {
-                                setShowMenu(!showMenu);
-                                setShowPropertyMenu(false);
-                                setShowUnitMenu(false);
-                            }}
-                            className="w-10 h-10 bg-black/60 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
-                        >
-                            <Ionicons name="person-circle-outline" size={28} color="white" />
-                        </TouchableOpacity>
-
-                        {showMenu && (
-                            <View className="absolute top-12 right-0 bg-white rounded-xl shadow-lg py-2 w-32">
-                                <TouchableOpacity
-                                    onPress={handleSignOut}
-                                    className="px-4 py-2 flex-row items-center"
-                                >
-                                    <Ionicons name="log-out-outline" size={20} color="black" />
-                                    <Text className="ml-2 text-black font-medium">Sign Out</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
-                </View>
-            </SafeAreaView>
-
-            {/* Capture Button Overlay */}
-            <View className="absolute bottom-0 left-0 right-0 mb-20 items-center z-20" pointerEvents="box-none">
-                <TouchableOpacity
-                    disabled={capturing}
-                    onPress={takePicture}
-                    className="w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10"
-                >
-                    <View className="w-[67px] h-[67px] rounded-full bg-white" />
-                </TouchableOpacity>
-            </View>
-
-            {/* Section Selector */}
-            <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-3">
-                <LinearGradient
-                    colors={['rgba(0,0,0,0.8)', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    className="absolute left-0 top-0 bottom-0 w-16 z-10"
-                    pointerEvents="none"
+            {/* Toast Notification */}
+            {toast && (
+                <ToastNotification
+                    message={toast.message}
+                    type={toast.type}
+                    onDismiss={() => setToast(null)}
                 />
-                <FlatList
-                    ref={flatListRef}
-                    data={[...sections, '+ Custom']}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    snapToAlignment="start"
-                    snapToInterval={ITEM_WIDTH}
-                    decelerationRate="fast"
-                    disableIntervalMomentum={true}
-                    contentContainerStyle={{ paddingHorizontal: (Dimensions.get('window').width - ITEM_WIDTH) / 2 }}
-                    keyExtractor={(item: string) => item}
-                    viewabilityConfig={{
-                        itemVisiblePercentThreshold: 50
-                    }}
-                    onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-                        if (tapTargetRef.current) return;
-
-                        const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
-                        const item = [...sections, '+ Custom'][index];
-                        if (item && item !== '+ Custom' && item !== selectedSection) {
-                            setSelectedSection(item);
-                        }
-                    }}
-                    scrollEventThrottle={16}
-                    onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-                        if (tapTargetRef.current) {
-                            const target = tapTargetRef.current;
-                            tapTargetRef.current = null;
-                            if (target !== '+ Custom') {
-                                setSelectedSection(target);
-                            }
-                        } else {
-                            const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_WIDTH);
-                            const item = [...sections, '+ Custom'][index];
-                            if (item && item !== '+ Custom') {
-                                setSelectedSection(item);
-                            }
-                        }
-                    }}
-                    renderItem={({ item, index }: { item: string, index: number }) => (
-                        <TouchableOpacity
-                            onPress={() => {
-                                if (item === '+ Custom') {
-                                    setShowCustomSectionModal(true);
-                                } else {
-                                    tapTargetRef.current = item;
-                                    flatListRef.current?.scrollToOffset({ offset: index * ITEM_WIDTH, animated: true });
-                                }
-                            }}
-                            style={{ width: ITEM_WIDTH, zIndex: selectedSection === item ? 50 : 1 }}
-                            className="justify-center items-center h-full"
-                        >
-                            <View
-                                style={{
-                                    position: 'absolute',
-                                    minWidth: ITEM_WIDTH,
-                                    height: 34,
-                                }}
-                                className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedSection === item && item !== '+ Custom'
-                                    ? 'bg-stone-900/80 border border-white/30'
-                                    : ''
-                                    }`}
-                            >
-                                <Text
-                                    numberOfLines={1}
-                                    className={`text-base font-medium ${selectedSection === item
-                                        ? 'text-white'
-                                        : 'text-white/60'
-                                        }`}
-                                >
-                                    {item}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    )}
-                />
-                <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.8)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    className="absolute right-0 top-0 bottom-0 w-16 z-10"
-                    pointerEvents="none"
-                />
-            </View>
-
-            {/* Custom Section Modal */}
-            <Modal
-                visible={showCustomSectionModal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowCustomSectionModal(false)}
-            >
-                <View className="flex-1 bg-black/80 justify-center items-center px-6">
-                    <View className="bg-stone-900 w-full rounded-2xl p-6 border border-white/10">
-                        <Text className="text-white text-xl font-bold mb-4">Add Custom Section</Text>
-                        <TextInput
-                            className="bg-stone-800 text-white p-4 rounded-xl mb-4 text-lg"
-                            placeholder="Section Name"
-                            placeholderTextColor="#666"
-                            value={customSectionText}
-                            onChangeText={setCustomSectionText}
-                            autoFocus
-                        />
-                        <View className="flex-row gap-4">
-                            <TouchableOpacity
-                                onPress={() => setShowCustomSectionModal(false)}
-                                className="flex-1 bg-stone-800 p-4 rounded-xl items-center"
-                            >
-                                <Text className="text-white font-semibold">Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={handleAddCustomSection}
-                                className="flex-1 bg-white p-4 rounded-xl items-center"
-                            >
-                                <Text className="text-black font-semibold">Add</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            )}
         </View >
     );
 }
