@@ -8,7 +8,7 @@ interface CaptureButtonProps {
 
 export function CaptureButton({ onPress, disabled }: CaptureButtonProps) {
     return (
-        <View className="absolute bottom-0 left-0 right-0 mb-48 items-center z-20" pointerEvents="box-none">
+        <View className="absolute bottom-0 left-0 right-0 mb-44 items-center z-20" pointerEvents="box-none">
             <TouchableOpacity
                 disabled={disabled}
                 onPress={onPress}
