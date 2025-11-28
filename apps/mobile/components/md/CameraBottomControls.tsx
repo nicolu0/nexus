@@ -11,6 +11,7 @@ interface CameraBottomControlsProps {
     capturing: boolean;
     itemWidth: number;
     tapTargetRef: React.MutableRefObject<string | null>;
+    activeSessionPhase?: string;
 }
 
 export function CameraBottomControls({
@@ -22,10 +23,15 @@ export function CameraBottomControls({
     capturing,
     itemWidth,
     tapTargetRef,
+    activeSessionPhase,
 }: CameraBottomControlsProps) {
     return (
         <>
-            <CaptureButton onPress={onCapture} disabled={capturing} />
+            <CaptureButton 
+                onPress={onCapture} 
+                disabled={capturing} 
+                activeSessionPhase={activeSessionPhase}
+            />
             <RoomSelector
                 rooms={rooms}
                 selectedRoom={selectedRoom}

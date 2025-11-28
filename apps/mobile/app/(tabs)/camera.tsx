@@ -7,7 +7,7 @@ import {
     Alert,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +18,8 @@ import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 import { ToastNotification } from '../../components/sm/ToastNotification';
 import * as Location from 'expo-location';
 import { setStatusBarStyle } from 'expo-status-bar';
+
+let hasAutoSelected = false;
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -73,6 +75,65 @@ export default function CameraScreen() {
     const [customRoomText, setCustomRoomText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const params = useLocalSearchParams<{ phase?: string; unitId?: string; sessionId?: string }>();
+    
+    // We'll derive phase/session info from database state instead of params for robustness
+    const [activeSession, setActiveSession] = useState<{ id: string; phase: 'move_in' | 'move_out'; tenancy_id: string } | null>(null);
+
+    useEffect(() => {
+        // When unit changes, check for active session
+        if (selectedUnit) {
+            fetchActiveSession(selectedUnit.id);
+        } else {
+            setActiveSession(null);
+        }
+    }, [selectedUnit]);
+    
+    // Also check if sessionId param is passed directly (optional override)
+    useEffect(() => {
+        if (params.sessionId) {
+            // If explicitly passed, we can rely on it or fetch details
+            // But fetchActiveSession covers the unit-based check
+        }
+    }, [params]);
+
+    async function fetchActiveSession(unitId: string) {
+        try {
+            // Find active tenancy for unit
+            const { data: tenancies } = await supabase
+                .from('tenancies')
+                .select('id')
+                .eq('unit_id', unitId);
+            
+            if (!tenancies || tenancies.length === 0) {
+                setActiveSession(null);
+                return;
+            }
+            
+            const tenancyIds = tenancies.map(t => t.id);
+
+            // Find in-progress session
+            const { data: session } = await supabase
+                .from('sessions')
+                .select('id, phase, tenancy_id')
+                .in('tenancy_id', tenancyIds)
+                .eq('status', 'in_progress')
+                .maybeSingle(); // Use maybeSingle to avoid error if none or multiple (take first)
+
+            if (session) {
+                setActiveSession({
+                    id: session.id,
+                    phase: session.phase as 'move_in' | 'move_out',
+                    tenancy_id: session.tenancy_id!
+                });
+            } else {
+                setActiveSession(null);
+            }
+        } catch (err) {
+            console.error('Error fetching active session:', err);
+            setActiveSession(null);
+        }
+    }
 
     useEffect(() => {
         if (showCustomRoomModal) {
@@ -86,7 +147,11 @@ export default function CameraScreen() {
         useCallback(() => {
             setStatusBarStyle('light');
             fetchProperties();
-        }, [])
+            // Re-check active session when screen is focused (e.g. after deleting a session)
+            if (selectedUnit) {
+                fetchActiveSession(selectedUnit.id);
+            }
+        }, [selectedUnit]) // Add selectedUnit as dependency to re-run if it changes or on focus
     );
 
     React.useEffect(() => {
@@ -134,42 +199,45 @@ export default function CameraScreen() {
                 setProperties(data);
 
                 // Try to find closest property
-                try {
-                    const { status } = await Location.requestForegroundPermissionsAsync();
-                    if (status === 'granted') {
-                        const location = await Location.getCurrentPositionAsync({});
-                        const { latitude, longitude } = location.coords;
+                if (!hasAutoSelected) {
+                    hasAutoSelected = true;
+                    try {
+                        const { status } = await Location.requestForegroundPermissionsAsync();
+                        if (status === 'granted') {
+                            const location = await Location.getCurrentPositionAsync({});
+                            const { latitude, longitude } = location.coords;
 
-                        let closestProperty = null;
-                        let minDistance = Infinity;
+                            let closestProperty = null;
+                            let minDistance = Infinity;
 
-                        data.forEach(property => {
-                            if (property.latitude && property.longitude) {
-                                const distance = getDistanceFromLatLonInKm(
-                                    latitude,
-                                    longitude,
-                                    property.latitude,
-                                    property.longitude
-                                );
-                                if (distance < minDistance) {
-                                    minDistance = distance;
-                                    closestProperty = property;
+                            data.forEach(property => {
+                                if (property.latitude && property.longitude) {
+                                    const distance = getDistanceFromLatLonInKm(
+                                        latitude,
+                                        longitude,
+                                        property.latitude,
+                                        property.longitude
+                                    );
+                                    if (distance < minDistance) {
+                                        minDistance = distance;
+                                        closestProperty = property;
+                                    }
                                 }
-                            }
-                        });
+                            });
 
-                        if (closestProperty) {
-                            setSelectedProperty(closestProperty);
+                            if (closestProperty) {
+                                setSelectedProperty(closestProperty);
+                            } else {
+                                setSelectedProperty(null);
+                            }
                         } else {
+                            // Fallback if permission denied
                             setSelectedProperty(null);
                         }
-                    } else {
-                        // Fallback if permission denied
+                    } catch (locError) {
+                        console.error('Error getting location:', locError);
                         setSelectedProperty(null);
                     }
-                } catch (locError) {
-                    console.error('Error getting location:', locError);
-                    setSelectedProperty(null);
                 }
             }
         } catch (e) {
@@ -271,6 +339,11 @@ export default function CameraScreen() {
             });
 
             if (activeTenancy) {
+                // If active session exists for this unit (which maps to a tenancy), prefer it
+                if (activeSession && activeSession.tenancy_id === activeTenancy.id) {
+                    return { tenancyId: activeSession.tenancy_id, phase: activeSession.phase };
+                }
+
                 // Determine phase based on dates
                 const start = new Date(activeTenancy.lease_start_date);
                 const end = activeTenancy.move_out_date ? new Date(activeTenancy.move_out_date) : null;
@@ -292,6 +365,9 @@ export default function CameraScreen() {
             // If no active tenancy, check upcoming
             const upcomingTenancy = tenancies.find(t => new Date(t.lease_start_date) > now);
             if (upcomingTenancy) {
+                if (activeSession && activeSession.tenancy_id === upcomingTenancy.id) {
+                    return { tenancyId: upcomingTenancy.id, phase: activeSession.phase };
+                }
                 return { tenancyId: upcomingTenancy.id, phase: 'move_in' };
             }
 
@@ -299,6 +375,11 @@ export default function CameraScreen() {
             const pastTenancy = tenancies[tenancies.length - 1];
             if (pastTenancy) {
                 // If recently ended (within 14 days) -> Move Out
+                // If active session exists for this tenancy, use it
+                if (activeSession && activeSession.tenancy_id === pastTenancy.id) {
+                     return { tenancyId: pastTenancy.id, phase: activeSession.phase };
+                }
+
                 const end = pastTenancy.move_out_date ? new Date(pastTenancy.move_out_date) : new Date(pastTenancy.lease_start_date); // Fallback
                 const daysSinceEnd = (now.getTime() - end.getTime()) / (1000 * 3600 * 24);
                 if (daysSinceEnd <= 14) return { tenancyId: pastTenancy.id, phase: 'move_out' };
@@ -406,13 +487,14 @@ export default function CameraScreen() {
                         name: selectedRoom,
                         room_id: roomId,
                         tenancy_id: tenancyId,
+                        session_id: activeSession?.id
                     })
                     .select('id')
                     .single();
 
                 if (groupError) throw groupError;
 
-                // 2. Create Image
+                // 2. Create Image (link session if active)
                 const { error: dbError } = await supabase
                     .from('images')
                     .insert({
@@ -469,6 +551,7 @@ export default function CameraScreen() {
                 capturing={capturing}
                 itemWidth={ITEM_WIDTH}
                 tapTargetRef={tapTargetRef}
+                activeSessionPhase={activeSession?.phase}
             />
 
             <CustomRoomModal

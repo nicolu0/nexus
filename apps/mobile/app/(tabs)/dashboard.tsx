@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
 import { setStatusBarStyle } from 'expo-status-bar';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 type Tenancy = {
     id: string;
@@ -117,10 +117,14 @@ function computeTenancyStatus(
     return 'Active';
 }
 
+// Outside component
+let hasAutoSelected = false;
+
 export default function DashboardScreen() {
     const [loading, setLoading] = useState(true);
     const [properties, setProperties] = useState<Property[]>([]);
     const [groups, setGroups] = useState<GroupRow[]>([]);
+    const [activeSessionsMap, setActiveSessionsMap] = useState<Record<string, string>>({});
     const [tenancyMoveOutMap, setTenancyMoveOutMap] = useState<
         Record<string, boolean>
     >({});
@@ -134,6 +138,7 @@ export default function DashboardScreen() {
     const [roomFilterId, setRoomFilterId] = useState<string | null>(null);
     const [unitModalVisible, setUnitModalVisible] = useState(false);
 
+    const router = useRouter();
     const insets = useSafeAreaInsets();
 
     useFocusEffect(
@@ -194,7 +199,8 @@ export default function DashboardScreen() {
             const castProps = (propsData ?? []) as any as Property[];
             setProperties(castProps);
 
-            if (!selectedPropertyId && castProps.length > 0) {
+            if (!hasAutoSelected && !selectedPropertyId && castProps.length > 0) {
+                hasAutoSelected = true;
                 // Default to first, but try to find closest
                 let bestId = castProps[0].id;
 
@@ -234,6 +240,7 @@ export default function DashboardScreen() {
             if (tenancyIds.length === 0) {
                 setGroups([]);
                 setTenancyMoveOutMap({});
+                setActiveSessionsMap({});
                 setLoading(false);
                 return;
             }
@@ -272,6 +279,22 @@ export default function DashboardScreen() {
                 if (hasMoveOut) moveOutMap[g.tenancy_id] = true;
             });
             setTenancyMoveOutMap(moveOutMap);
+
+            // 5) Fetch active sessions for these tenancies
+            const { data: sessionsData } = await supabase
+                .from('sessions')
+                .select('id, tenancy_id')
+                .in('tenancy_id', tenancyIds)
+                .eq('status', 'in_progress');
+
+            const sessionsMap: Record<string, string> = {};
+            (sessionsData || []).forEach((s) => {
+                if (s.tenancy_id) {
+                    sessionsMap[s.tenancy_id] = s.id;
+                }
+            });
+            setActiveSessionsMap(sessionsMap);
+
         } catch (err) {
             console.error('Error loading dashboard:', err);
         } finally {
@@ -671,10 +694,78 @@ export default function DashboardScreen() {
                                 {/* Groups grid */}
                                 {selectedUnitGroups.length === 0 ? (
                                     <View className="flex-1 justify-center items-center px-4">
-                                        <Text className="text-sm text-gray-500 text-center">
-                                            No groups yet for this tenancy. Start capturing photos
-                                            in the Camera tab.
-                                        </Text>
+                                        {selectedUnitMeta?.tenancy?.id && activeSessionsMap[selectedUnitMeta.tenancy.id] ? (
+                                            <View className="items-center">
+                                                <Text className="text-sm text-gray-500 text-center mb-1">
+                                                    You already started a Session for this unit.
+                                                </Text>
+                                                <TouchableOpacity onPress={() => {
+                                                    setUnitModalVisible(false);
+                                                    router.push('/(tabs)/sessions');
+                                                }}>
+                                                    <Text className="text-sm font-semibold text-blue-600 text-center">
+                                                        View Session
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : (
+                                            <>
+                                                <Text className="text-sm text-gray-500 text-center mb-4">
+                                                    No groups yet for this tenancy.
+                                                </Text>
+                                                {selectedUnitMeta?.tenancy?.lease_start_date && (
+                                                    <TouchableOpacity
+                                                        onPress={async () => {
+                                                            if (!selectedUnitMeta.tenancy) return;
+
+                                                            const phase = selectedUnitMeta.tenancy.lease_start_date < '2025-07-01'
+                                                                ? 'move_out'
+                                                                : 'move_in';
+
+                                                            setUnitModalVisible(false);
+
+                                                            try {
+                                                                const { data: sessionData, error: sessionError } = await supabase
+                                                                    .from('sessions')
+                                                                    .insert({
+                                                                        tenancy_id: selectedUnitMeta.tenancy.id,
+                                                                        phase: phase,
+                                                                        status: 'in_progress',
+                                                                        created_by: (await supabase.auth.getUser()).data.user?.id
+                                                                    })
+                                                                    .select('id')
+                                                                    .single();
+
+                                                                if (sessionError) throw sessionError;
+
+                                                                router.push({
+                                                                    pathname: '/(tabs)/camera',
+                                                                    params: {
+                                                                        phase,
+                                                                        unitId: selectedUnitMeta.unit.id,
+                                                                        sessionId: sessionData.id
+                                                                    }
+                                                                });
+                                                            } catch (e) {
+                                                                console.error('Error creating session:', e);
+                                                                // Fallback navigation without session ID if creation fails
+                                                                router.push({
+                                                                    pathname: '/(tabs)/camera',
+                                                                    params: { phase, unitId: selectedUnitMeta.unit.id }
+                                                                });
+                                                            }
+                                                        }}
+                                                        className="bg-black px-5 py-3 rounded-full"
+                                                    >
+                                                        <Text className="text-white font-semibold">
+                                                            {selectedUnitMeta.tenancy.lease_start_date < '2025-07-01'
+                                                                ? 'Start move out photos'
+                                                                : 'Start move in photos'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            </>
+                                        )}
                                     </View>
                                 ) : (
                                     <FlatList
