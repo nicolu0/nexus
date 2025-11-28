@@ -98,15 +98,27 @@
 		repair: GroupImage | null;
 	};
 
-	async function loadGroups(unitId: string): Promise<EnrichedGroup[]> {
+	async function loadGroups(unitId: string) {
 		const { data, error } = await supabase
 			.from('groups')
 			.select(
 				`
-				  id, name, room_id, description, tenancy_id,
-				  rooms!inner ( id, unit_id, name ),
-				  images ( id, group_id, phase, path, mime_type, created_at, notes )
-    `
+			id, name, room_id, description, tenancy_id,
+			rooms!inner ( id, unit_id, name ),
+			images (
+				id,
+				group_id,
+				session_id,
+				path,
+				mime_type,
+				created_at,
+				notes,
+				sessions (
+					id,
+					phase
+				)
+			)
+		`
 			)
 			.eq('rooms.unit_id', unitId);
 
@@ -116,13 +128,23 @@
 		}
 
 		const rawGroups = data ?? [];
+		console.log(rawGroups);
 
 		const enriched = rawGroups.map((g) => {
-			const images = (g.images ?? []).map((img) => ({
-				...img,
-				url: imageUrl(img.path)
-			}));
+			// 1) add URL + phase from sessions to each image
+			const images = (g.images ?? []).map((img: any) => {
+				const phase = img.sessions?.phase ?? null; // 'move_in' | 'move_out' | 'repair' | null
 
+				return {
+					id: img.id,
+					url: imageUrl(img.path),
+					created_at: img.created_at,
+					phase,
+					notes: img.notes ?? null
+				} as GroupImage;
+			});
+
+			// 2) helper to pick image by phase
 			const pick = (phase: 'move_in' | 'move_out' | 'repair') =>
 				images.find((i) => i.phase === phase) ?? null;
 
@@ -319,7 +341,7 @@
 {/if}
 
 {#if selectedGroup}
-	<GroupModal selectedGroup={selectedGroup} onClose={() => (selectedGroup = null)} />
+	<GroupModal {selectedGroup} onClose={() => (selectedGroup = null)} />
 {/if}
 
 <style>

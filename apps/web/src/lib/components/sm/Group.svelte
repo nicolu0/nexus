@@ -50,6 +50,9 @@
 		repair?: GroupImage | null;
 	}>();
 
+	$inspect(movein);
+	$inspect(moveout);
+	$inspect(repair);
 	// derived status label (text)
 	const status = repair ? 'Repair' : moveout ? 'Move-out' : movein ? 'Move-in' : 'No photos';
 
