@@ -1,24 +1,30 @@
 <script lang="ts">
 	import UnitStatusPill from '$lib/components/sm/UnitStatusPill.svelte';
-	import type { Property, UnitSummary } from '$lib/types/dashboard';
+	import StatusDot from '$lib/components/sm/StatusDot.svelte';
+	import type { Property, StageValue, UnitSummary } from '$lib/types/dashboard';
 
 	const noop = () => {};
 	const noopSelect = (_property?: Property, _unit?: UnitSummary) => {};
+	const noopStage = (_unitId: string, _stage: StageValue) => {};
 
 	const loadingProperties = Array.from({ length: 6 });
 	const loadingUnits = Array.from({ length: 5 });
 	let collapsedPropertyIds = $state(new Set<string>());
+	let stageDropdownUnitId = $state<string | null>(null);
+	const STAGE_OPTIONS: StageValue[] = ['Vacant', 'Move-in', 'Move-out'];
 
 	let {
 		properties = [],
 		isLoading = false,
 		onAddUnit = noop,
-		onSelectUnit = noopSelect
+		onSelectUnit = noopSelect,
+		onStageChange = noopStage
 	} = $props<{
 		properties?: Property[];
 		isLoading?: boolean;
 		onAddUnit?: (property: Property) => void;
 		onSelectUnit?: (property: Property, unit: UnitSummary) => void;
+		onStageChange?: (unitId: string, stage: StageValue) => void | Promise<void>;
 	}>();
 
 	function togglePropertyUnits(propertyId: string) {
@@ -31,6 +37,31 @@
 		}
 
 		collapsedPropertyIds = next;
+	}
+
+	function handleUnitRowKeydown(
+		event: KeyboardEvent,
+		property: Property,
+		unit: UnitSummary
+	): void {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		onSelectUnit(property, unit);
+	}
+
+	function toggleStageDropdown(event: MouseEvent, unitId: string) {
+		event.stopPropagation();
+		stageDropdownUnitId = stageDropdownUnitId === unitId ? null : unitId;
+	}
+
+	async function handleStageOptionClick(
+		event: MouseEvent,
+		unitId: string,
+		stage: StageValue
+	) {
+		event.stopPropagation();
+		stageDropdownUnitId = null;
+		await onStageChange(unitId, stage);
 	}
 </script>
 
@@ -124,17 +155,65 @@
 
 					{#if !isCollapsed}
 						{#each property.units as unit (unit.id)}
-							<button
-								class="flex flex-row items-center justify-between p-3 text-sm font-normal text-stone-600 transition hover:bg-stone-100 focus-visible:outline-none"
+							<div
+								role="button"
+								tabindex="0"
+								class="flex cursor-pointer flex-row items-center justify-between p-3 text-left text-sm font-normal text-stone-600 transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-300"
 								onclick={() => onSelectUnit(property, unit)}
+								onkeydown={(event) => handleUnitRowKeydown(event, property, unit)}
 							>
 								<div class="flex flex-row gap-2">
 									{unit.label}
 								</div>
 								<div class="flex flex-row gap-2">
-									<UnitStatusPill label={unit.stage} />
+									<div class="relative z-10">
+										<button
+											type="button"
+											class="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-300"
+											onclick={(event) => toggleStageDropdown(event, unit.id)}
+										>
+											<UnitStatusPill label={unit.stage}>
+												<svg
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													stroke-width="1.8"
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													class={`h-3 w-3 text-stone-500 transition-transform ${
+														stageDropdownUnitId === unit.id ? 'rotate-180' : ''
+													}`}
+													aria-hidden="true"
+												>
+													<path d="M6 9l6 6 6-6" />
+												</svg>
+											</UnitStatusPill>
+										</button>
+
+											{#if stageDropdownUnitId === unit.id}
+											<div
+												class="absolute right-0 z-10 mt-2 w-32 rounded-md border border-stone-200 bg-white py-1 text-xs shadow-lg"
+												onclick={(event) => event.stopPropagation()}
+											>
+												{#each STAGE_OPTIONS as option}
+													<button
+														type="button"
+														class={`flex w-full items-center justify-between px-3 py-1.5 text-left ${
+															unit.stage === option ? 'bg-stone-200' : 'hover:bg-stone-100'
+														}`}
+														onclick={(event) => handleStageOptionClick(event, unit.id, option)}
+													>
+														<div class="flex flex-row items-center gap-1 font-normal">
+															<StatusDot stage={option} />
+															{option}
+														</div>
+													</button>
+												{/each}
+											</div>
+										{/if}
+									</div>
 								</div>
-							</button>
+							</div>
 						{/each}
 
 						{#if property.units.length === 0}

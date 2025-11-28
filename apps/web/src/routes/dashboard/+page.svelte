@@ -5,7 +5,13 @@
 	import UnitPage from '$lib/components/lg/UnitPage.svelte';
 	import AddPropertyModal from '$lib/components/modals/AddPropertyModal.svelte';
 	import AddUnitModal from '$lib/components/modals/AddUnitModal.svelte';
-	import type { Property, PropertyStatusFilter, Section, UnitSummary } from '$lib/types/dashboard';
+	import type {
+		Property,
+		PropertyStatusFilter,
+		Section,
+		StageValue,
+		UnitSummary
+	} from '$lib/types/dashboard';
 	import supabase from '$lib/supabaseClient';
 	import { onMount } from 'svelte';
 
@@ -129,19 +135,21 @@
 			isLoading = false;
 		}
 	};
-	type StageValue = 'Vacant' | 'Move-in' | 'Move-out';
+	async function updateUnitStage(unitId: string, next: StageValue) {
+		const { error } = await supabase.from('units').update({ stage: next }).eq('id', unitId);
 
-	function handleUnitStageChange(next: StageValue) {
-		if (!selectedUnit) return;
-		const unitId = selectedUnit.id;
+		if (error) {
+			console.error('update stage error', error);
+			return;
+		}
 
-		// update the selectedUnit object
-		selectedUnit = {
-			...selectedUnit,
-			stage: next
-		};
+		if (selectedUnit?.id === unitId) {
+			selectedUnit = {
+				...selectedUnit,
+				stage: next
+			};
+		}
 
-		// update the matching unit inside properties → units
 		properties = properties.map((property) => ({
 			...property,
 			units: property.units.map((unit) => (unit.id === unitId ? { ...unit, stage: next } : unit))
@@ -368,6 +376,9 @@
 					selectedProperty = property;
 					unitPanelFullscreen = false;
 				}}
+				onStageChange={(unitId, stage) => {
+					void updateUnitStage(unitId, stage);
+				}}
 			/>
 		</div>
 		<UnitPage
@@ -382,7 +393,6 @@
 				selectedProperty = null;
 				unitPanelFullscreen = false;
 			}}
-			onStageChange={handleUnitStageChange}
 		/>
 	</div>
 </div>

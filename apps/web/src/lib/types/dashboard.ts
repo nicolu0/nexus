@@ -10,6 +10,8 @@ export type UnitSummary = {
 	stage: string;
 };
 
+export type StageValue = 'Vacant' | 'Move-in' | 'Move-out';
+
 export type Section = {
 	id: string;
 	label: string;
