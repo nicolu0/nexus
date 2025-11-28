@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { setStatusBarStyle } from 'expo-status-bar';
 
 type SessionStatus = 'in_progress' | 'completed' | 'abandoned' | string;
 type SessionPhase = string;
@@ -21,10 +22,13 @@ type SessionRow = {
     tenancy_id: string | null;
     phase: SessionPhase;
     status: SessionStatus;
-    notes: string | null;
+    created_by: string | null;
     started_at: string;
     completed_at: string | null;
     last_activity_at: string;
+    tenancies: {
+        unit_id: string;
+    } | null;
 };
 
 type Filter = 'all' | 'in_progress' | 'completed';
@@ -82,7 +86,12 @@ export default function SessionsScreen() {
         try {
             const { data, error } = await supabase
                 .from('sessions')
-                .select('*')
+                .select(`
+                    *,
+                    tenancies (
+                        unit_id
+                    )
+                `)
                 .order('last_activity_at', { ascending: false });
 
             if (error) throw error;
@@ -97,6 +106,7 @@ export default function SessionsScreen() {
 
     useFocusEffect(
         useCallback(() => {
+            setStatusBarStyle('dark');
             loadSessions();
         }, [loadSessions])
     );
@@ -181,7 +191,9 @@ export default function SessionsScreen() {
 
                 {/* Second row: basic unit / tenancy hint */}
                 <Text className="text-xs text-stone-500 mb-1">
-                    Unit {item.unit_id.slice(0, 8)}
+                    {item.tenancies?.unit_id
+                         ? `Unit ${item.tenancies.unit_id.slice(0, 8)}`
+                         : 'No unit linked'}
                     {item.tenancy_id
                         ? ` · Tenancy ${item.tenancy_id.slice(0, 6)}…`
                         : ' · No tenancy linked'}
@@ -196,15 +208,6 @@ export default function SessionsScreen() {
                         Last activity {formatDateTime(item.last_activity_at)}
                     </Text>
                 </View>
-
-                {item.notes && (
-                    <Text
-                        numberOfLines={2}
-                        className="mt-2 text-xs text-stone-600"
-                    >
-                        {item.notes}
-                    </Text>
-                )}
 
                 {isInProgress && (
                     <View className="mt-2 flex-row items-center">

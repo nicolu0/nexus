@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,6 +7,7 @@ import {
     Alert,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +17,9 @@ import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 import { ToastNotification } from '../../components/sm/ToastNotification';
 import * as Location from 'expo-location';
+import { setStatusBarStyle } from 'expo-status-bar';
+
+let hasAutoSelected = false;
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -71,6 +75,65 @@ export default function CameraScreen() {
     const [customRoomText, setCustomRoomText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const params = useLocalSearchParams<{ phase?: string; unitId?: string; sessionId?: string }>();
+    
+    // We'll derive phase/session info from database state instead of params for robustness
+    const [activeSession, setActiveSession] = useState<{ id: string; phase: 'move_in' | 'move_out'; tenancy_id: string } | null>(null);
+
+    useEffect(() => {
+        // When unit changes, check for active session
+        if (selectedUnit) {
+            fetchActiveSession(selectedUnit.id);
+        } else {
+            setActiveSession(null);
+        }
+    }, [selectedUnit]);
+    
+    // Also check if sessionId param is passed directly (optional override)
+    useEffect(() => {
+        if (params.sessionId) {
+            // If explicitly passed, we can rely on it or fetch details
+            // But fetchActiveSession covers the unit-based check
+        }
+    }, [params]);
+
+    async function fetchActiveSession(unitId: string) {
+        try {
+            // Find active tenancy for unit
+            const { data: tenancies } = await supabase
+                .from('tenancies')
+                .select('id')
+                .eq('unit_id', unitId);
+            
+            if (!tenancies || tenancies.length === 0) {
+                setActiveSession(null);
+                return;
+            }
+            
+            const tenancyIds = tenancies.map(t => t.id);
+
+            // Find in-progress session
+            const { data: session } = await supabase
+                .from('sessions')
+                .select('id, phase, tenancy_id')
+                .in('tenancy_id', tenancyIds)
+                .eq('status', 'in_progress')
+                .maybeSingle(); // Use maybeSingle to avoid error if none or multiple (take first)
+
+            if (session) {
+                setActiveSession({
+                    id: session.id,
+                    phase: session.phase as 'move_in' | 'move_out',
+                    tenancy_id: session.tenancy_id!
+                });
+            } else {
+                setActiveSession(null);
+            }
+        } catch (err) {
+            console.error('Error fetching active session:', err);
+            setActiveSession(null);
+        }
+    }
 
     useEffect(() => {
         if (showCustomRoomModal) {
@@ -80,9 +143,16 @@ export default function CameraScreen() {
 
     const ITEM_WIDTH = 110;
 
-    React.useEffect(() => {
-        fetchProperties();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            setStatusBarStyle('light');
+            fetchProperties();
+            // Re-check active session when screen is focused (e.g. after deleting a session)
+            if (selectedUnit) {
+                fetchActiveSession(selectedUnit.id);
+            }
+        }, [selectedUnit]) // Add selectedUnit as dependency to re-run if it changes or on focus
+    );
 
     React.useEffect(() => {
         if (selectedProperty) {
@@ -129,42 +199,45 @@ export default function CameraScreen() {
                 setProperties(data);
 
                 // Try to find closest property
-                try {
-                    const { status } = await Location.requestForegroundPermissionsAsync();
-                    if (status === 'granted') {
-                        const location = await Location.getCurrentPositionAsync({});
-                        const { latitude, longitude } = location.coords;
+                if (!hasAutoSelected) {
+                    hasAutoSelected = true;
+                    try {
+                        const { status } = await Location.requestForegroundPermissionsAsync();
+                        if (status === 'granted') {
+                            const location = await Location.getCurrentPositionAsync({});
+                            const { latitude, longitude } = location.coords;
 
-                        let closestProperty = null;
-                        let minDistance = Infinity;
+                            let closestProperty = null;
+                            let minDistance = Infinity;
 
-                        data.forEach(property => {
-                            if (property.latitude && property.longitude) {
-                                const distance = getDistanceFromLatLonInKm(
-                                    latitude,
-                                    longitude,
-                                    property.latitude,
-                                    property.longitude
-                                );
-                                if (distance < minDistance) {
-                                    minDistance = distance;
-                                    closestProperty = property;
+                            data.forEach(property => {
+                                if (property.latitude && property.longitude) {
+                                    const distance = getDistanceFromLatLonInKm(
+                                        latitude,
+                                        longitude,
+                                        property.latitude,
+                                        property.longitude
+                                    );
+                                    if (distance < minDistance) {
+                                        minDistance = distance;
+                                        closestProperty = property;
+                                    }
                                 }
-                            }
-                        });
+                            });
 
-                        if (closestProperty) {
-                            setSelectedProperty(closestProperty);
+                            if (closestProperty) {
+                                setSelectedProperty(closestProperty);
+                            } else {
+                                setSelectedProperty(null);
+                            }
                         } else {
+                            // Fallback if permission denied
                             setSelectedProperty(null);
                         }
-                    } else {
-                        // Fallback if permission denied
+                    } catch (locError) {
+                        console.error('Error getting location:', locError);
                         setSelectedProperty(null);
                     }
-                } catch (locError) {
-                    console.error('Error getting location:', locError);
-                    setSelectedProperty(null);
                 }
             }
         } catch (e) {
@@ -239,136 +312,85 @@ export default function CameraScreen() {
         }
     }
 
-    async function getOrCreateSession(unitId: string, userId: string) {
+    async function getPhotoContext(unitId: string) {
         try {
-            // 1. Check for existing in_progress session (any phase)
-            const { data: existingSession, error: fetchError } = await supabase
-                .from('sessions')
-                .select('id')
-                .eq('unit_id', unitId)
-                .eq('status', 'in_progress')
-                .order('last_activity_at', { ascending: false })
-                .limit(1)
-                .single();
-
-            if (fetchError && fetchError.code !== 'PGRST116') {
-                throw fetchError;
-            }
-
-            if (existingSession) {
-                await supabase
-                    .from('sessions')
-                    .update({ last_activity_at: new Date().toISOString() })
-                    .eq('id', existingSession.id);
-
-                // Fetch full session details to return
-                const { data: fullSession } = await supabase
-                    .from('sessions')
-                    .select('tenancy_id, phase')
-                    .eq('id', existingSession.id)
-                    .single();
-
-                return {
-                    sessionId: existingSession.id,
-                    tenancyId: fullSession?.tenancy_id,
-                    phase: fullSession?.phase
-                };
-            }
-
-            // 2. Fetch tenancies to determine context
-            const now = new Date().toISOString();
-            const { data: tenancies, error: tenanciesError } = await supabase
+            const now = new Date();
+            const { data: tenancies, error } = await supabase
                 .from('tenancies')
-                .select('id, lease_start_date, lease_end_date')
+                .select('id, lease_start_date, move_out_date')
                 .eq('unit_id', unitId)
                 .order('lease_start_date', { ascending: true });
 
-            if (tenanciesError) throw tenanciesError;
-
-            let phase = 'move_in';
-            let tenancyId = null;
-
-            const upcomingTenant = tenancies?.find(t => t.lease_start_date > now);
-            // Prior tenant is the latest one that has already started (and potentially ended)
-            const priorTenants = tenancies?.filter(t => t.lease_start_date <= now) || [];
-            const priorTenant = priorTenants[priorTenants.length - 1];
+            if (error) throw error;
 
             if (!tenancies || tenancies.length === 0) {
-                // Scenario A: No tenants -> Move-in, no tenancy
-                phase = 'move_in';
-                tenancyId = null;
-            } else if (upcomingTenant && !priorTenant) {
-                // Scenario B: Upcoming tenant, no prior -> Move-in for upcoming
-                phase = 'move_in';
-                tenancyId = upcomingTenant.id;
-            } else if (priorTenant) {
-                // Scenario C: Prior tenant exists
-
-                // Check for completed move_out
-                const { data: moveOut } = await supabase
-                    .from('sessions')
-                    .select('id')
-                    .eq('unit_id', unitId)
-                    .eq('tenancy_id', priorTenant.id)
-                    .eq('phase', 'move_out')
-                    .eq('status', 'completed')
-                    .single();
-
-                if (!moveOut) {
-                    phase = 'move_out';
-                    tenancyId = priorTenant.id;
-                } else {
-                    // Check for completed repair
-                    const { data: repair } = await supabase
-                        .from('sessions')
-                        .select('id')
-                        .eq('unit_id', unitId)
-                        .eq('tenancy_id', priorTenant.id)
-                        .eq('phase', 'repair')
-                        .eq('status', 'completed')
-                        .single();
-
-                    if (!repair) {
-                        phase = 'repair';
-                        tenancyId = priorTenant.id;
-                    } else {
-                        // Both move-outs done
-                        if (upcomingTenant) {
-                            phase = 'move_in';
-                            tenancyId = upcomingTenant.id;
-                        } else {
-                            phase = 'move_in';
-                            tenancyId = null;
-                        }
-                    }
-                }
+                return { tenancyId: null, phase: 'move_in' };
             }
 
-            // 3. Create new session with determined phase and tenancy
-            const { data: newSession, error: createError } = await supabase
-                .from('sessions')
-                .insert({
-                    unit_id: unitId,
-                    created_by: userId,
-                    status: 'in_progress',
-                    phase: phase,
-                    tenancy_id: tenancyId,
-                    started_at: new Date().toISOString(),
-                    last_activity_at: new Date().toISOString(),
-                })
-                .select('id')
-                .single();
+            // Find relevant tenancy
+            // 1. Check for active tenancy (start <= now <= end/move_out)
+            // 2. Check for upcoming tenancy (start > now)
+            // 3. Check for recently ended tenancy (move_out < now)
 
-            if (createError) throw createError;
-            return {
-                sessionId: newSession.id,
-                tenancyId: tenancyId,
-                phase: phase
-            };
+            const activeTenancy = tenancies.find(t => {
+                const start = new Date(t.lease_start_date);
+                const end = t.move_out_date ? new Date(t.move_out_date) : new Date('9999-12-31');
+                return now >= start && now <= end;
+            });
+
+            if (activeTenancy) {
+                // If active session exists for this unit (which maps to a tenancy), prefer it
+                if (activeSession && activeSession.tenancy_id === activeTenancy.id) {
+                    return { tenancyId: activeSession.tenancy_id, phase: activeSession.phase };
+                }
+
+                // Determine phase based on dates
+                const start = new Date(activeTenancy.lease_start_date);
+                const end = activeTenancy.move_out_date ? new Date(activeTenancy.move_out_date) : null;
+
+                // If within 14 days of start -> Move In
+                const daysSinceStart = (now.getTime() - start.getTime()) / (1000 * 3600 * 24);
+                if (daysSinceStart <= 14) return { tenancyId: activeTenancy.id, phase: 'move_in' };
+
+                // If within 14 days of end -> Move Out
+                if (end) {
+                    const daysUntilEnd = (end.getTime() - now.getTime()) / (1000 * 3600 * 24);
+                    if (daysUntilEnd <= 14) return { tenancyId: activeTenancy.id, phase: 'move_out' };
+                }
+
+                // Default to repair/inspection during tenancy
+                return { tenancyId: activeTenancy.id, phase: 'repair' };
+            }
+
+            // If no active tenancy, check upcoming
+            const upcomingTenancy = tenancies.find(t => new Date(t.lease_start_date) > now);
+            if (upcomingTenancy) {
+                if (activeSession && activeSession.tenancy_id === upcomingTenancy.id) {
+                    return { tenancyId: upcomingTenancy.id, phase: activeSession.phase };
+                }
+                return { tenancyId: upcomingTenancy.id, phase: 'move_in' };
+            }
+
+            // If no upcoming, check most recent past
+            const pastTenancy = tenancies[tenancies.length - 1];
+            if (pastTenancy) {
+                // If recently ended (within 14 days) -> Move Out
+                // If active session exists for this tenancy, use it
+                if (activeSession && activeSession.tenancy_id === pastTenancy.id) {
+                     return { tenancyId: pastTenancy.id, phase: activeSession.phase };
+                }
+
+                const end = pastTenancy.move_out_date ? new Date(pastTenancy.move_out_date) : new Date(pastTenancy.lease_start_date); // Fallback
+                const daysSinceEnd = (now.getTime() - end.getTime()) / (1000 * 3600 * 24);
+                if (daysSinceEnd <= 14) return { tenancyId: pastTenancy.id, phase: 'move_out' };
+            }
+
+            // Fallback
+            return { tenancyId: null, phase: 'move_in' };
 
         } catch (e) {
-            console.error('Error managing session:', e);
-            throw e;
+            console.error('Error determining context:', e);
+            return { tenancyId: null, phase: 'move_in' };
         }
     }
 
@@ -429,6 +451,11 @@ export default function CameraScreen() {
             return;
         }
 
+        if (!selectedRoom) {
+            Alert.alert('Select Room', 'Please select a room before taking a photo.');
+            return;
+        }
+
         // Haptic feedback
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -450,29 +477,39 @@ export default function CameraScreen() {
                 );
                 console.log('Uploaded to Supabase:', storagePath, publicUrl);
 
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    // Get or create session
-                    const { sessionId, tenancyId, phase } = await getOrCreateSession(selectedUnit.id, user.id);
-                    const roomId = roomIdMap[selectedRoom];
+                const { tenancyId, phase } = await getPhotoContext(selectedUnit.id);
+                const roomId = roomIdMap[selectedRoom];
 
-                    const { error: dbError } = await supabase
-                        .from('images')
-                        .insert({
-                            path: storagePath,
-                            room_id: roomId,
-                            tenancy_id: tenancyId,
-                            phase: phase,
-                            mime_type: 'image/jpeg',
-                        });
+                // 1. Create Group
+                const { data: group, error: groupError } = await supabase
+                    .from('groups')
+                    .insert({
+                        name: selectedRoom,
+                        room_id: roomId,
+                        tenancy_id: tenancyId,
+                        session_id: activeSession?.id
+                    })
+                    .select('id')
+                    .single();
 
-                    if (dbError) {
-                        console.error('Error saving image metadata:', dbError);
-                        showToast('Failed to save image metadata', 'error');
-                    } else {
-                        console.log('Image metadata saved to database');
-                        showToast('Photo saved!', 'success');
-                    }
+                if (groupError) throw groupError;
+
+                // 2. Create Image (link session if active)
+                const { error: dbError } = await supabase
+                    .from('images')
+                    .insert({
+                        path: storagePath,
+                        group_id: group.id,
+                        phase: phase,
+                        mime_type: 'image/jpeg',
+                    });
+
+                if (dbError) {
+                    console.error('Error saving image metadata:', dbError);
+                    showToast('Failed to save image metadata', 'error');
+                } else {
+                    console.log('Image metadata saved to database');
+                    showToast('Photo saved!', 'success');
                 }
             }
         } catch (e) {
@@ -514,6 +551,7 @@ export default function CameraScreen() {
                 capturing={capturing}
                 itemWidth={ITEM_WIDTH}
                 tapTargetRef={tapTargetRef}
+                activeSessionPhase={activeSession?.phase}
             />
 
             <CustomRoomModal
