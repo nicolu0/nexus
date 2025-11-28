@@ -11,6 +11,7 @@
 	const loadingUnits = Array.from({ length: 5 });
 	let collapsedPropertyIds = $state(new Set<string>());
 	let stageDropdownUnitId = $state<string | null>(null);
+	let stageHoverUnitId = $state<string | null>(null);
 	const STAGE_OPTIONS: StageValue[] = ['Vacant', 'Move-in', 'Move-out'];
 
 	let {
@@ -39,11 +40,7 @@
 		collapsedPropertyIds = next;
 	}
 
-	function handleUnitRowKeydown(
-		event: KeyboardEvent,
-		property: Property,
-		unit: UnitSummary
-	): void {
+	function handleUnitRowKeydown(event: KeyboardEvent, property: Property, unit: UnitSummary): void {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
 		onSelectUnit(property, unit);
@@ -54,11 +51,17 @@
 		stageDropdownUnitId = stageDropdownUnitId === unitId ? null : unitId;
 	}
 
-	async function handleStageOptionClick(
-		event: MouseEvent,
-		unitId: string,
-		stage: StageValue
-	) {
+	function handleStageButtonEnter(unitId: string) {
+		stageHoverUnitId = unitId;
+	}
+
+	function handleStageButtonLeave(unitId: string) {
+		if (stageHoverUnitId === unitId) {
+			stageHoverUnitId = null;
+		}
+	}
+
+	async function handleStageOptionClick(event: MouseEvent, unitId: string, stage: StageValue) {
 		event.stopPropagation();
 		stageDropdownUnitId = null;
 		await onStageChange(unitId, stage);
@@ -158,7 +161,9 @@
 							<div
 								role="button"
 								tabindex="0"
-								class="flex cursor-pointer flex-row items-center justify-between p-3 text-left text-sm font-normal text-stone-600 transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-300"
+								class={`flex cursor-pointer flex-row items-center justify-between p-3 text-left text-sm font-normal text-stone-600 transition focus-visible:ring-2 focus-visible:ring-stone-300 focus-visible:outline-none ${
+									stageHoverUnitId === unit.id ? '' : 'hover:bg-stone-100'
+								}`}
 								onclick={() => onSelectUnit(property, unit)}
 								onkeydown={(event) => handleUnitRowKeydown(event, property, unit)}
 							>
@@ -169,8 +174,11 @@
 									<div class="relative z-10">
 										<button
 											type="button"
-											class="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-300"
+											class="rounded-full focus-visible:ring-2 focus-visible:ring-stone-300 focus-visible:outline-none"
+											class:bg-stone-100={stageHoverUnitId === unit.id}
 											onclick={(event) => toggleStageDropdown(event, unit.id)}
+											onmouseenter={() => handleStageButtonEnter(unit.id)}
+											onmouseleave={() => handleStageButtonLeave(unit.id)}
 										>
 											<UnitStatusPill label={unit.stage}>
 												<svg
@@ -190,10 +198,12 @@
 											</UnitStatusPill>
 										</button>
 
-											{#if stageDropdownUnitId === unit.id}
+										{#if stageDropdownUnitId === unit.id}
 											<div
 												class="absolute right-0 z-10 mt-2 w-32 rounded-md border border-stone-200 bg-white py-1 text-xs shadow-lg"
 												onclick={(event) => event.stopPropagation()}
+												onmouseenter={() => handleStageButtonEnter(unit.id)}
+												onmouseleave={() => handleStageButtonLeave(unit.id)}
 											>
 												{#each STAGE_OPTIONS as option}
 													<button
