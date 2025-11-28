@@ -16,6 +16,7 @@ import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 import { ToastNotification } from '../../components/sm/ToastNotification';
 import * as Location from 'expo-location';
+import { StatusBar } from 'expo-status-bar';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -239,136 +240,72 @@ export default function CameraScreen() {
         }
     }
 
-    async function getOrCreateSession(unitId: string, userId: string) {
+    async function getPhotoContext(unitId: string) {
         try {
-            // 1. Check for existing in_progress session (any phase)
-            const { data: existingSession, error: fetchError } = await supabase
-                .from('sessions')
-                .select('id')
-                .eq('unit_id', unitId)
-                .eq('status', 'in_progress')
-                .order('last_activity_at', { ascending: false })
-                .limit(1)
-                .single();
-
-            if (fetchError && fetchError.code !== 'PGRST116') {
-                throw fetchError;
-            }
-
-            if (existingSession) {
-                await supabase
-                    .from('sessions')
-                    .update({ last_activity_at: new Date().toISOString() })
-                    .eq('id', existingSession.id);
-
-                // Fetch full session details to return
-                const { data: fullSession } = await supabase
-                    .from('sessions')
-                    .select('tenancy_id, phase')
-                    .eq('id', existingSession.id)
-                    .single();
-
-                return {
-                    sessionId: existingSession.id,
-                    tenancyId: fullSession?.tenancy_id,
-                    phase: fullSession?.phase
-                };
-            }
-
-            // 2. Fetch tenancies to determine context
-            const now = new Date().toISOString();
-            const { data: tenancies, error: tenanciesError } = await supabase
+            const now = new Date();
+            const { data: tenancies, error } = await supabase
                 .from('tenancies')
-                .select('id, lease_start_date, lease_end_date')
+                .select('id, lease_start_date, move_out_date')
                 .eq('unit_id', unitId)
                 .order('lease_start_date', { ascending: true });
 
-            if (tenanciesError) throw tenanciesError;
-
-            let phase = 'move_in';
-            let tenancyId = null;
-
-            const upcomingTenant = tenancies?.find(t => t.lease_start_date > now);
-            // Prior tenant is the latest one that has already started (and potentially ended)
-            const priorTenants = tenancies?.filter(t => t.lease_start_date <= now) || [];
-            const priorTenant = priorTenants[priorTenants.length - 1];
+            if (error) throw error;
 
             if (!tenancies || tenancies.length === 0) {
-                // Scenario A: No tenants -> Move-in, no tenancy
-                phase = 'move_in';
-                tenancyId = null;
-            } else if (upcomingTenant && !priorTenant) {
-                // Scenario B: Upcoming tenant, no prior -> Move-in for upcoming
-                phase = 'move_in';
-                tenancyId = upcomingTenant.id;
-            } else if (priorTenant) {
-                // Scenario C: Prior tenant exists
-
-                // Check for completed move_out
-                const { data: moveOut } = await supabase
-                    .from('sessions')
-                    .select('id')
-                    .eq('unit_id', unitId)
-                    .eq('tenancy_id', priorTenant.id)
-                    .eq('phase', 'move_out')
-                    .eq('status', 'completed')
-                    .single();
-
-                if (!moveOut) {
-                    phase = 'move_out';
-                    tenancyId = priorTenant.id;
-                } else {
-                    // Check for completed repair
-                    const { data: repair } = await supabase
-                        .from('sessions')
-                        .select('id')
-                        .eq('unit_id', unitId)
-                        .eq('tenancy_id', priorTenant.id)
-                        .eq('phase', 'repair')
-                        .eq('status', 'completed')
-                        .single();
-
-                    if (!repair) {
-                        phase = 'repair';
-                        tenancyId = priorTenant.id;
-                    } else {
-                        // Both move-outs done
-                        if (upcomingTenant) {
-                            phase = 'move_in';
-                            tenancyId = upcomingTenant.id;
-                        } else {
-                            phase = 'move_in';
-                            tenancyId = null;
-                        }
-                    }
-                }
+                return { tenancyId: null, phase: 'move_in' };
             }
 
-            // 3. Create new session with determined phase and tenancy
-            const { data: newSession, error: createError } = await supabase
-                .from('sessions')
-                .insert({
-                    unit_id: unitId,
-                    created_by: userId,
-                    status: 'in_progress',
-                    phase: phase,
-                    tenancy_id: tenancyId,
-                    started_at: new Date().toISOString(),
-                    last_activity_at: new Date().toISOString(),
-                })
-                .select('id')
-                .single();
+            // Find relevant tenancy
+            // 1. Check for active tenancy (start <= now <= end/move_out)
+            // 2. Check for upcoming tenancy (start > now)
+            // 3. Check for recently ended tenancy (move_out < now)
 
-            if (createError) throw createError;
-            return {
-                sessionId: newSession.id,
-                tenancyId: tenancyId,
-                phase: phase
-            };
+            const activeTenancy = tenancies.find(t => {
+                const start = new Date(t.lease_start_date);
+                const end = t.move_out_date ? new Date(t.move_out_date) : new Date('9999-12-31');
+                return now >= start && now <= end;
+            });
+
+            if (activeTenancy) {
+                // Determine phase based on dates
+                const start = new Date(activeTenancy.lease_start_date);
+                const end = activeTenancy.move_out_date ? new Date(activeTenancy.move_out_date) : null;
+
+                // If within 14 days of start -> Move In
+                const daysSinceStart = (now.getTime() - start.getTime()) / (1000 * 3600 * 24);
+                if (daysSinceStart <= 14) return { tenancyId: activeTenancy.id, phase: 'move_in' };
+
+                // If within 14 days of end -> Move Out
+                if (end) {
+                    const daysUntilEnd = (end.getTime() - now.getTime()) / (1000 * 3600 * 24);
+                    if (daysUntilEnd <= 14) return { tenancyId: activeTenancy.id, phase: 'move_out' };
+                }
+
+                // Default to repair/inspection during tenancy
+                return { tenancyId: activeTenancy.id, phase: 'repair' };
+            }
+
+            // If no active tenancy, check upcoming
+            const upcomingTenancy = tenancies.find(t => new Date(t.lease_start_date) > now);
+            if (upcomingTenancy) {
+                return { tenancyId: upcomingTenancy.id, phase: 'move_in' };
+            }
+
+            // If no upcoming, check most recent past
+            const pastTenancy = tenancies[tenancies.length - 1];
+            if (pastTenancy) {
+                // If recently ended (within 14 days) -> Move Out
+                const end = pastTenancy.move_out_date ? new Date(pastTenancy.move_out_date) : new Date(pastTenancy.lease_start_date); // Fallback
+                const daysSinceEnd = (now.getTime() - end.getTime()) / (1000 * 3600 * 24);
+                if (daysSinceEnd <= 14) return { tenancyId: pastTenancy.id, phase: 'move_out' };
+            }
+
+            // Fallback
+            return { tenancyId: null, phase: 'move_in' };
 
         } catch (e) {
-            console.error('Error managing session:', e);
-            throw e;
+            console.error('Error determining context:', e);
+            return { tenancyId: null, phase: 'move_in' };
         }
     }
 
@@ -429,6 +366,11 @@ export default function CameraScreen() {
             return;
         }
 
+        if (!selectedRoom) {
+            Alert.alert('Select Room', 'Please select a room before taking a photo.');
+            return;
+        }
+
         // Haptic feedback
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -450,29 +392,38 @@ export default function CameraScreen() {
                 );
                 console.log('Uploaded to Supabase:', storagePath, publicUrl);
 
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    // Get or create session
-                    const { sessionId, tenancyId, phase } = await getOrCreateSession(selectedUnit.id, user.id);
-                    const roomId = roomIdMap[selectedRoom];
+                const { tenancyId, phase } = await getPhotoContext(selectedUnit.id);
+                const roomId = roomIdMap[selectedRoom];
 
-                    const { error: dbError } = await supabase
-                        .from('images')
-                        .insert({
-                            path: storagePath,
-                            room_id: roomId,
-                            tenancy_id: tenancyId,
-                            phase: phase,
-                            mime_type: 'image/jpeg',
-                        });
+                // 1. Create Group
+                const { data: group, error: groupError } = await supabase
+                    .from('groups')
+                    .insert({
+                        name: selectedRoom,
+                        room_id: roomId,
+                        tenancy_id: tenancyId,
+                    })
+                    .select('id')
+                    .single();
 
-                    if (dbError) {
-                        console.error('Error saving image metadata:', dbError);
-                        showToast('Failed to save image metadata', 'error');
-                    } else {
-                        console.log('Image metadata saved to database');
-                        showToast('Photo saved!', 'success');
-                    }
+                if (groupError) throw groupError;
+
+                // 2. Create Image
+                const { error: dbError } = await supabase
+                    .from('images')
+                    .insert({
+                        path: storagePath,
+                        group_id: group.id,
+                        phase: phase,
+                        mime_type: 'image/jpeg',
+                    });
+
+                if (dbError) {
+                    console.error('Error saving image metadata:', dbError);
+                    showToast('Failed to save image metadata', 'error');
+                } else {
+                    console.log('Image metadata saved to database');
+                    showToast('Photo saved!', 'success');
                 }
             }
         } catch (e) {
@@ -492,6 +443,7 @@ export default function CameraScreen() {
 
     return (
         <View className="flex-1 bg-black">
+            <StatusBar style="light" />
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
             <CameraTopControls

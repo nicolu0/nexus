@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function TabLayout() {
     return (
-        <NativeTabs 
+        <NativeTabs
             tintColor={DynamicColorIOS({
                 dark: 'slateblue',
                 light: 'slateblue',
