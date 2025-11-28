@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,6 +7,7 @@ import {
     Alert,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
 import * as Haptics from 'expo-haptics';
@@ -16,7 +17,7 @@ import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 import { ToastNotification } from '../../components/sm/ToastNotification';
 import * as Location from 'expo-location';
-import { StatusBar } from 'expo-status-bar';
+import { setStatusBarStyle } from 'expo-status-bar';
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -81,9 +82,12 @@ export default function CameraScreen() {
 
     const ITEM_WIDTH = 110;
 
-    React.useEffect(() => {
-        fetchProperties();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            setStatusBarStyle('light');
+            fetchProperties();
+        }, [])
+    );
 
     React.useEffect(() => {
         if (selectedProperty) {
@@ -443,7 +447,6 @@ export default function CameraScreen() {
 
     return (
         <View className="flex-1 bg-black">
-            <StatusBar style="light" />
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
             <CameraTopControls

@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { setStatusBarStyle } from 'expo-status-bar';
 
 type SessionStatus = 'in_progress' | 'completed' | 'abandoned' | string;
 type SessionPhase = string;
@@ -97,6 +98,7 @@ export default function SessionsScreen() {
 
     useFocusEffect(
         useCallback(() => {
+            setStatusBarStyle('dark');
             loadSessions();
         }, [loadSessions])
     );

@@ -13,7 +13,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
-import { StatusBar } from 'expo-status-bar';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { useFocusEffect } from 'expo-router';
 
 type Tenancy = {
     id: string;
@@ -134,6 +135,12 @@ export default function DashboardScreen() {
     const [unitModalVisible, setUnitModalVisible] = useState(false);
 
     const insets = useSafeAreaInsets();
+
+    useFocusEffect(
+        React.useCallback(() => {
+            setStatusBarStyle('dark');
+        }, [])
+    );
 
     useEffect(() => {
         async function loadDashboard() {
@@ -400,7 +407,6 @@ export default function DashboardScreen() {
 
     return (
         <View className="flex-1 bg-stone-50">
-            <StatusBar style="dark" />
             <SafeAreaView className="flex-1">
                 {/* HEADER */}
                 <View className="px-4 pt-2 pb-3 flex-row items-center justify-between">
@@ -484,7 +490,10 @@ export default function DashboardScreen() {
                 </View>
 
                 {/* UNITS LIST FOR SELECTED PROPERTY */}
-                <ScrollView className="flex-1 px-4 pb-4">
+                <ScrollView
+                    className="flex-1 px-4"
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+                >
                     {!selectedProperty && (
                         <View className="mt-10 items-center">
                             <Text className="text-sm text-gray-500 text-center">
