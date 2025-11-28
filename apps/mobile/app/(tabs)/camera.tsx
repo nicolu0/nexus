@@ -92,10 +92,71 @@ export default function CameraScreen() {
     // Also check if sessionId param is passed directly (optional override)
     useEffect(() => {
         if (params.sessionId) {
-            // If explicitly passed, we can rely on it or fetch details
-            // But fetchActiveSession covers the unit-based check
+            fetchSessionAndSetContext(params.sessionId);
         }
-    }, [params]);
+    }, [params.sessionId]);
+
+    async function fetchSessionAndSetContext(sessionId: string) {
+        try {
+            const { data: session, error } = await supabase
+                .from('sessions')
+                .select(`
+                    id,
+                    phase,
+                    tenancy_id,
+                    tenancies (
+                        unit_id,
+                        units (
+                            id,
+                            unit_number,
+                            property_id,
+                            properties (
+                                id,
+                                name,
+                                latitude,
+                                longitude
+                            )
+                        )
+                    )
+                `)
+                .eq('id', sessionId)
+                .single();
+
+            if (error || !session) return;
+
+            // @ts-ignore - complex nested join type
+            const unitData = session.tenancies?.units;
+            // @ts-ignore
+            const propertyData = unitData?.properties;
+
+            if (unitData && propertyData) {
+                // Set property first
+                setSelectedProperty({
+                    id: propertyData.id,
+                    name: propertyData.name,
+                    latitude: propertyData.latitude,
+                    longitude: propertyData.longitude
+                });
+
+                // Then unit (need to make sure units are fetched or we set it manually)
+                // Since we have the ID and number, we can set it directly
+                setSelectedUnit({
+                    id: unitData.id,
+                    unit_number: unitData.unit_number
+                });
+
+                // Active session state will be updated by the useEffect listening to selectedUnit
+                // but we can also set it here to be snappy
+                setActiveSession({
+                    id: session.id,
+                    phase: session.phase as 'move_in' | 'move_out',
+                    tenancy_id: session.tenancy_id!
+                });
+            }
+        } catch (e) {
+            console.error('Error fetching session context:', e);
+        }
+    }
 
     async function fetchActiveSession(unitId: string) {
         try {
@@ -115,10 +176,28 @@ export default function CameraScreen() {
             // Find in-progress session
             const { data: session } = await supabase
                 .from('sessions')
-                .select('id, phase, tenancy_id')
+                .select(`
+                    id, 
+                    phase, 
+                    tenancy_id,
+                    tenancies (
+                        unit_id,
+                        units (
+                            id,
+                            unit_number,
+                            property_id,
+                            properties (
+                                id,
+                                name,
+                                latitude,
+                                longitude
+                            )
+                        )
+                    )
+                `)
                 .in('tenancy_id', tenancyIds)
                 .eq('status', 'in_progress')
-                .maybeSingle(); // Use maybeSingle to avoid error if none or multiple (take first)
+                .maybeSingle();
 
             if (session) {
                 setActiveSession({
@@ -126,6 +205,13 @@ export default function CameraScreen() {
                     phase: session.phase as 'move_in' | 'move_out',
                     tenancy_id: session.tenancy_id!
                 });
+
+                // If explicitly passed via navigation or simply on load, we might want to sync state
+                // But if the user manually navigated to camera and we found a session, we should probably select it
+                // However, the `unitId` argument comes from `selectedUnit`, so we're already looking at that unit.
+                // The only case to handle is setting property/unit if `fetchActiveSession` was called with an ID 
+                // that ISN'T currently selected (e.g. from params).
+                
             } else {
                 setActiveSession(null);
             }
@@ -487,7 +573,7 @@ export default function CameraScreen() {
                         name: selectedRoom,
                         room_id: roomId,
                         tenancy_id: tenancyId,
-                        session_id: activeSession?.id
+                        // session_id removed from groups
                     })
                     .select('id')
                     .single();
@@ -500,8 +586,9 @@ export default function CameraScreen() {
                     .insert({
                         path: storagePath,
                         group_id: group.id,
-                        phase: phase,
+                        // phase removed from images
                         mime_type: 'image/jpeg',
+                        session_id: activeSession?.id
                     });
 
                 if (dbError) {

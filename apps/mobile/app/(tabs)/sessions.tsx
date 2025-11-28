@@ -6,6 +6,8 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
+    Modal,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,6 +41,10 @@ export default function SessionsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<Filter>('all');
     const [error, setError] = useState<string | null>(null);
+
+    const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
+    const [sessionImages, setSessionImages] = useState<{ id: string; path: string }[]>([]);
+    const [loadingImages, setLoadingImages] = useState(false);
 
     const phaseLabel = (phase: SessionPhase) => {
         switch (phase) {
@@ -111,6 +117,35 @@ export default function SessionsScreen() {
         }, [loadSessions])
     );
 
+    const fetchSessionImages = async (sessionId: string) => {
+        setLoadingImages(true);
+        try {
+            // Fetch images directly from images table using session_id
+            const { data, error } = await supabase
+                .from('images')
+                .select('id, path')
+                .eq('session_id', sessionId);
+
+            if (error) throw error;
+
+            setSessionImages(data || []);
+        } catch (e) {
+            console.error('Error fetching session images:', e);
+        } finally {
+            setLoadingImages(false);
+        }
+    };
+
+    const openSession = (session: SessionRow) => {
+        setSelectedSession(session);
+        fetchSessionImages(session.id);
+    };
+
+    const closeSession = () => {
+        setSelectedSession(null);
+        setSessionImages([]);
+    };
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await loadSessions();
@@ -154,10 +189,7 @@ export default function SessionsScreen() {
         return (
             <TouchableOpacity
                 className="mb-3 mx-4 rounded-xl bg-white border border-stone-200 shadow-sm px-4 py-3"
-                onPress={() => {
-                    // TODO: navigate into this session to resume / view details
-                    console.log('Tapped session', item.id);
-                }}
+                onPress={() => openSession(item)}
             >
                 {/* First row: phase + status pill */}
                 <View className="flex-row justify-between items-center mb-1">
@@ -217,7 +249,7 @@ export default function SessionsScreen() {
                             color="#22c55e"
                         />
                         <Text className="ml-1 text-[11px] text-emerald-600">
-                            In-progress session — tap to resume
+                            In-progress session
                         </Text>
                     </View>
                 )}
@@ -289,6 +321,61 @@ export default function SessionsScreen() {
                         contentContainerStyle={{ paddingBottom: 16 }}
                     />
                 )}
+
+                {/* Session Images Modal */}
+                <Modal
+                    visible={!!selectedSession}
+                    animationType="slide"
+                    presentationStyle="fullScreen"
+                    onRequestClose={closeSession}
+                >
+                    <SafeAreaView className="flex-1 bg-stone-50">
+                        <View className="px-4 pt-2 pb-3 border-b border-stone-200 flex-row items-center justify-between bg-white">
+                            <TouchableOpacity onPress={closeSession} className="p-2 -ml-2">
+                                <Ionicons name="close" size={24} color="#1c1917" />
+                            </TouchableOpacity>
+                            <Text className="font-semibold text-lg text-stone-900">
+                                {selectedSession ? phaseLabel(selectedSession.phase) : 'Session'}
+                            </Text>
+                            <View className="w-8" /> 
+                        </View>
+
+                        {loadingImages ? (
+                            <View className="flex-1 justify-center items-center">
+                                <ActivityIndicator size="large" />
+                            </View>
+                        ) : sessionImages.length === 0 ? (
+                            <View className="flex-1 justify-center items-center px-8">
+                                <Ionicons name="images-outline" size={48} color="#d6d3d1" />
+                                <Text className="mt-4 text-stone-500 text-center">
+                                    No photos in this session yet.
+                                </Text>
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={sessionImages}
+                                keyExtractor={(item) => item.id}
+                                numColumns={3}
+                                contentContainerStyle={{ padding: 2 }}
+                                renderItem={({ item }) => {
+                                    const publicUrl = supabase.storage
+                                        .from('unit-images')
+                                        .getPublicUrl(item.path).data.publicUrl;
+                                    
+                                    return (
+                                        <View className="w-1/3 aspect-square p-0.5">
+                                            <Image
+                                                source={{ uri: publicUrl }}
+                                                className="w-full h-full bg-stone-200"
+                                                resizeMode="cover"
+                                            />
+                                        </View>
+                                    );
+                                }}
+                            />
+                        )}
+                    </SafeAreaView>
+                </Modal>
             </SafeAreaView>
         </View>
     );

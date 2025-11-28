@@ -45,11 +45,12 @@ type Room = {
     name: string;
 };
 
-type ImageRow = {
-    id: string;
-    phase: 'move_in' | 'move_out' | 'repair';
-    path: string;
-};
+    type ImageRow = {
+        id: string;
+        // phase: 'move_in' | 'move_out' | 'repair'; // removed
+        path: string;
+        session?: { phase: string } | null;
+    };
 
 type GroupRow = {
     id: string;
@@ -259,8 +260,10 @@ export default function DashboardScreen() {
         ),
         images (
           id,
-          phase,
-          path
+          path,
+          session:sessions (
+            phase
+          )
         )
       `)
                 .in('tenancy_id', tenancyIds);
@@ -274,11 +277,13 @@ export default function DashboardScreen() {
             const moveOutMap: Record<string, boolean> = {};
             castGroups.forEach((g) => {
                 if (!g.tenancy_id) return;
+                // Check if any image in this group belongs to a move_out session
                 const hasMoveOut =
-                    g.images?.some((img) => img.phase === 'move_out') ?? false;
+                    g.images?.some((img: any) => img.session?.phase === 'move_out') ?? false;
                 if (hasMoveOut) moveOutMap[g.tenancy_id] = true;
             });
             setTenancyMoveOutMap(moveOutMap);
+
 
             // 5) Fetch active sessions for these tenancies
             const { data: sessionsData } = await supabase
@@ -400,7 +405,7 @@ export default function DashboardScreen() {
     }
 
     function stageBadges(images: ImageRow[] | null | undefined) {
-        const phases = new Set(images?.map((i) => i.phase));
+        const phases = new Set(images?.map((i) => i.session?.phase));
         // Filter out inactive badges
         const badges: { label: string; active: boolean }[] = [
             { label: 'Move-in', active: phases.has('move_in') },
