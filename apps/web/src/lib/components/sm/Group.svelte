@@ -39,29 +39,35 @@
 		// new schema props
 		name = 'Bed',
 		room = 'Bedroom 1',
-		description = null,
 		movein = null,
 		moveout = null,
 		repair = null
 	} = $props<{
 		name?: string;
 		room?: string;
-		description?: string | null;
 		movein?: GroupImage | null;
 		moveout?: GroupImage | null;
 		repair?: GroupImage | null;
 	}>();
 
-	// derived status
-	const status = repair ? 'Repaired' : moveout ? 'Move-out' : movein ? 'Move-in' : 'No photos';
+	// derived status label (text)
+	const status = repair ? 'Repair' : moveout ? 'Move-out' : movein ? 'Move-in' : 'No photos';
 
-	// derived timestamp = latest of existing images
+	// latest image + timestamp
 	const allImages = [movein, moveout, repair].filter(Boolean) as GroupImage[];
+
 	let timestamp = $state('');
+	let latestImage: GroupImage | null = $state(null);
+	const statusDotClass = $derived.by(() => {
+		if (repair) return 'bg-red-500';
+		if (moveout) return 'bg-emerald-500';
+		if (movein) return 'bg-blue-500';
+		return 'bg-stone-500';
+	});
+
 	if (allImages.length) {
-		const latest = allImages.reduce((latest, img) =>
-			img.created_at > latest.created_at ? img : latest
-		);
+		const latest = allImages.reduce((curr, img) => (img.created_at > curr.created_at ? img : curr));
+		latestImage = latest;
 		timestamp = toTimestamp(latest.created_at);
 	}
 
@@ -101,7 +107,7 @@
 	<!-- main card -->
 	<div class="relative overflow-hidden rounded-2xl bg-black shadow-xl">
 		<div class="relative w-full">
-			<div class="relative aspect-[4/3] w-full">
+			<div class="relative aspect-4/3 w-full">
 				{#if displaySlot?.imageUrl}
 					<img
 						src={displaySlot.imageUrl}
@@ -129,13 +135,8 @@
 			<div class="absolute inset-0 flex flex-col">
 				<div class="flex items-center justify-between px-4 pt-4">
 					<div class="flex items-center gap-1 text-xs text-white">
-						<span class="h-2 w-2 rounded-full bg-red-500"></span>
+						<span class={`h-2 w-2 rounded-full ${statusDotClass}`}></span>
 						<span class="font-normal text-white">{status}</span>
-					</div>
-
-					<div class="relative overflow-hidden rounded-full">
-						<div class="pointer-events-none absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
-						<div class="relative px-3 py-1 text-[10px] font-light text-stone-100">No Damage</div>
 					</div>
 				</div>
 

@@ -34,21 +34,6 @@
 		return data.publicUrl;
 	}
 
-	function toTimestamp(createdAt: string | Date | null | undefined): string {
-		if (!createdAt) return '';
-
-		const d = new Date(createdAt);
-		if (Number.isNaN(d.getTime())) return '';
-
-		const mm = String(d.getMonth() + 1).padStart(2, '0'); // 01–12
-		const dd = String(d.getDate()).padStart(2, '0'); // 01–31
-		const yy = String(d.getFullYear()).slice(-2); // 25
-		const hh = String(d.getHours()).padStart(2, '0'); // 00–23
-		const min = String(d.getMinutes()).padStart(2, '0'); // 00–59
-
-		return `${mm}/${dd}/${yy} ${hh}:${min}`; // e.g. "11/26/25 11:33"
-	}
-
 	async function loadGroups(unitId: string) {
 		const { data, error } = await supabase
 			.from('groups')
@@ -164,28 +149,47 @@
 					</button>
 				</div>
 			</div>
-			<label
-				class="inline-flex h-8 items-center rounded-md border border-stone-200 bg-white px-2 text-xs transition focus-within:ring-1 focus-within:ring-stone-300"
-			>
-				<span class="flex items-center text-stone-400">
+			<div class="flex w-full flex-row gap-4">
+				<button
+					class="flex shrink-0 flex-row items-center gap-1 rounded-md border border-stone-300 bg-white px-3 py-1 text-xs font-normal"
+				>
+					Move-in
 					<svg
-						viewBox="0 0 16 16"
+						viewBox="0 0 24 24"
 						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
+						stroke="currentColor"
+						stroke-width="1.8"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						class="h-4 w-4 transition-transform"
 						aria-hidden="true"
-						class="h-3 w-3"
 					>
-						<path
-							d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.018-.009Zm-5.242.656a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9Z"
-							fill="currentColor"
-						/>
+						<path d="M6 9l6 6 6-6" />
 					</svg>
-				</span>
-				<input
-					class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:font-light placeholder:text-stone-400 focus:ring-0 focus:outline-none"
-					placeholder="All groups..."
-				/>
-			</label>
+				</button>
+				<label
+					class="inline-flex h-8 w-full items-center rounded-md border border-stone-200 bg-white px-2 text-xs transition focus-within:ring-1 focus-within:ring-stone-300"
+				>
+					<span class="flex items-center text-stone-400">
+						<svg
+							viewBox="0 0 16 16"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+							aria-hidden="true"
+							class="h-3 w-3"
+						>
+							<path
+								d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.018-.009Zm-5.242.656a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9Z"
+								fill="currentColor"
+							/>
+						</svg>
+					</span>
+					<input
+						class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:font-light placeholder:text-stone-400 focus:ring-0 focus:outline-none"
+						placeholder="All groups..."
+					/>
+				</label>
+			</div>
 		</div>
 
 		<div class="px-4 pb-6">

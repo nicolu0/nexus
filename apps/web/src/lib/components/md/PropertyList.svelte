@@ -69,8 +69,19 @@
 					class="flex flex-col divide-y divide-stone-200 rounded-md border border-stone-200 bg-white"
 				>
 					<div class="flex items-center justify-between p-3">
-						<div class="flex flex-row items-center gap-2 text-sm font-medium text-stone-600">
-							<StatusDot />
+						<div class="flex flex-row items-center gap-2 text-sm font-medium text-stone-500">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="16"
+								height="16"
+								fill="currentColor"
+								class="bi bi-building-fill"
+								viewBox="0 0 16 16"
+							>
+								<path
+									d="M3 0a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h3v-3.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V16h3a1 1 0 0 0 1-1V1a1 1 0 0 0-1-1zm1 2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5M4 5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM7.5 5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5m2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM4.5 8h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5m2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5"
+								/>
+							</svg>
 							{property.name}
 						</div>
 
@@ -118,14 +129,21 @@
 								class="flex flex-row items-center justify-between p-3 text-sm font-normal text-stone-600 transition hover:bg-stone-100 focus-visible:outline-none"
 								onclick={() => onSelectUnit(property, unit)}
 							>
-								{unit.label}
+								<div class="flex flex-row gap-2">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										fill="currentColor"
+										class="bi bi-house-door-fill h-4 w-4"
+										viewBox="0 0 16 16"
+									>
+										<path
+											d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5"
+										/>
+									</svg>
+									{unit.label}
+								</div>
 								<div class="flex flex-row gap-2">
 									<UnitStatusPill label="Move-in" color="bg-blue-400" />
-									{#if unit.sections.length > 0}
-										{#each unit.sections as section (section.id)}
-											<UnitStatusPill label={section.label} />
-										{/each}
-									{/if}
 								</div>
 							</button>
 						{/each}
