@@ -1,5 +1,4 @@
 <script lang="ts">
-	import StatusDot from '$lib/components/sm/StatusDot.svelte';
 	import UnitStatusPill from '$lib/components/sm/UnitStatusPill.svelte';
 	import type { Property, UnitSummary } from '$lib/types/dashboard';
 
@@ -143,7 +142,7 @@
 									{unit.label}
 								</div>
 								<div class="flex flex-row gap-2">
-									<UnitStatusPill label="Move-in" color="bg-blue-400" />
+									<UnitStatusPill label={unit.stage} />
 								</div>
 							</button>
 						{/each}
