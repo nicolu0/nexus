@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { fly, scale } from 'svelte/transition';
-	import { onMount } from 'svelte';
+	import { fly } from 'svelte/transition';
 	import type { Property, UnitSummary } from '$lib/types/dashboard';
-	import Group, { type GroupImageSlot } from '../sm/Group.svelte';
+	import Group from '../sm/Group.svelte';
 	import supabase from '$lib/supabaseClient';
+	import StatusDot from '../sm/StatusDot.svelte';
 
 	const noop = () => {};
 
@@ -12,13 +12,15 @@
 		selectedProperty = null,
 		onClose = noop,
 		isFullscreen = false,
-		onToggleFullscreen = noop
+		onToggleFullscreen = noop,
+		onStageChange = noop
 	} = $props<{
 		selectedUnit?: UnitSummary | null;
 		selectedProperty?: Property | null;
 		onClose?: () => void;
 		isFullscreen?: boolean;
 		onToggleFullscreen?: () => void;
+		onStageChange?: (stage: StageValue) => void;
 	}>();
 
 	const shortAddr = (addr: string, n = 18) => (addr.length > n ? addr.slice(0, n) + '…' : addr);
@@ -33,6 +35,48 @@
 		const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
 		return data.publicUrl;
 	}
+
+	// ---------- STAGE DROPDOWN ----------
+
+	type StageValue = 'Vacant' | 'Move-in' | 'Move-out';
+
+	const STAGE_OPTIONS: StageValue[] = ['Vacant', 'Move-in', 'Move-out'];
+
+	let stageOpen = $state(false);
+	let unitStage = $state<StageValue>('Vacant');
+
+	// sync local stage whenever selectedUnit changes
+	$effect(() => {
+		if (selectedUnit?.stage) {
+			unitStage = selectedUnit.stage as StageValue;
+		}
+	});
+
+	async function updateStage(next: StageValue) {
+		if (!selectedUnit) return;
+
+		stageOpen = false;
+
+		// optimistic UI
+		const prevStage = unitStage;
+		unitStage = next;
+
+		const { error } = await supabase
+			.from('units')
+			.update({ stage: next })
+			.eq('id', selectedUnit.id);
+
+		if (error) {
+			console.error('update stage error', error);
+			unitStage = prevStage; // revert
+			return;
+		}
+
+		// inform parent that the stage changed for this unit
+		onStageChange(next);
+	}
+
+	// ---------- GROUPS LOADING ----------
 
 	async function loadGroups(unitId: string) {
 		const { data, error } = await supabase
@@ -54,13 +98,11 @@
 		const rawGroups = data ?? [];
 
 		const enriched = rawGroups.map((g) => {
-			// 1) add URL to each image
 			const images = (g.images ?? []).map((img) => ({
 				...img,
 				url: imageUrl(img.path)
 			}));
 
-			// 2) helper to pick image by phase
 			const pick = (phase: 'move_in' | 'move_out' | 'repair') =>
 				images.find((i) => i.phase === phase) ?? null;
 
@@ -77,7 +119,6 @@
 			};
 		});
 
-		console.log('enriched groups:', enriched);
 		return enriched;
 	}
 
@@ -86,9 +127,23 @@
 		loadGroups(selectedUnit.id).then((enrichedGroups) => (groups = enrichedGroups));
 	});
 
-	let groups = $state<any>([]);
-	$inspect(groups);
+	let groups = $state<any[]>([]);
 	let selectedGroup = $state(null);
+
+	let groupSearch = $state('');
+
+	const filteredGroups = $derived(
+		!groupSearch.trim()
+			? groups
+			: groups.filter((g) => {
+					const q = groupSearch.toLowerCase();
+					return (
+						(g.name && g.name.toLowerCase().includes(q)) ||
+						(g.room && g.room.toLowerCase().includes(q)) ||
+						(g.description && g.description.toLowerCase().includes(q))
+					);
+				})
+	);
 </script>
 
 {#if selectedUnit}
@@ -149,24 +204,55 @@
 					</button>
 				</div>
 			</div>
-			<div class="flex w-full flex-row gap-4">
-				<button
-					class="flex shrink-0 flex-row items-center gap-1 rounded-md border border-stone-300 bg-white px-3 py-1 text-xs font-normal"
-				>
-					Move-in
-					<svg
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.8"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						class="h-4 w-4 transition-transform"
-						aria-hidden="true"
+
+			<div class="flex w-full flex-row gap-2">
+				<div class="relative">
+					<button
+						type="button"
+						class="flex h-full w-28 shrink-0 flex-row items-center justify-between rounded-md border border-stone-200 bg-white px-3 py-1 text-xs font-normal"
+						onclick={() => (stageOpen = !stageOpen)}
 					>
-						<path d="M6 9l6 6 6-6" />
-					</svg>
-				</button>
+						<div class="flex flex-row items-center gap-1">
+							<StatusDot stage={unitStage} />
+							{unitStage}
+						</div>
+						<svg
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.8"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							class={`h-4 w-4 transition-transform ${stageOpen ? 'rotate-180' : ''}`}
+							aria-hidden="true"
+						>
+							<path d="M6 9l6 6 6-6" />
+						</svg>
+					</button>
+
+					{#if stageOpen}
+						<div
+							class="absolute left-0 z-30 mt-1 w-28 rounded-md border border-stone-200 bg-white py-1 text-xs shadow-lg"
+						>
+							{#each STAGE_OPTIONS as option}
+								<button
+									type="button"
+									class={`flex w-full items-center justify-between px-3 py-1.5 text-left ${
+										unitStage === option ? 'bg-stone-200' : 'hover:bg-stone-100'
+									}`}
+									onclick={() => updateStage(option)}
+								>
+									<div class="flex flex-row items-center gap-1 font-normal">
+										<StatusDot stage={option} />
+										{option}
+									</div>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<!-- Search -->
 				<label
 					class="inline-flex h-8 w-full items-center rounded-md border border-stone-200 bg-white px-2 text-xs transition focus-within:ring-1 focus-within:ring-stone-300"
 				>
@@ -185,8 +271,9 @@
 						</svg>
 					</span>
 					<input
-						class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs text-stone-900 placeholder:font-light placeholder:text-stone-400 focus:ring-0 focus:outline-none"
+						class="w-40 appearance-none border-0 bg-transparent pl-2 text-xs font-light text-stone-900 placeholder:font-light placeholder:text-stone-400 focus:ring-0 focus:outline-none"
 						placeholder="All groups..."
+						bind:value={groupSearch}
 					/>
 				</label>
 			</div>
@@ -194,7 +281,7 @@
 
 		<div class="px-4 pb-6">
 			<div class={`grid gap-4 ${isFullscreen ? 'grid-cols-4' : 'grid-cols-2'}`}>
-				{#each groups as group, i (i)}
+				{#each filteredGroups as group (group.id)}
 					<button type="button" class="text-left" onclick={() => (selectedGroup = group)}>
 						<Group
 							name={group.name}

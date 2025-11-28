@@ -53,24 +53,22 @@
 	// derived status label (text)
 	const status = repair ? 'Repair' : moveout ? 'Move-out' : movein ? 'Move-in' : 'No photos';
 
-	// latest image + timestamp
-	const allImages = [movein, moveout, repair].filter(Boolean) as GroupImage[];
+	const allImages = $derived([movein, moveout, repair].filter(Boolean) as GroupImage[]);
 
-	let timestamp = $state('');
-	let latestImage: GroupImage | null = $state(null);
+	const latestImage = $derived<GroupImage | null>(
+		allImages.length
+			? allImages.reduce((curr, img) => (img.created_at > curr.created_at ? img : curr))
+			: null
+	);
+
+	const timestamp = $derived(latestImage ? toTimestamp(latestImage.created_at) : '');
+
 	const statusDotClass = $derived.by(() => {
 		if (repair) return 'bg-red-500';
 		if (moveout) return 'bg-emerald-500';
 		if (movein) return 'bg-blue-500';
 		return 'bg-stone-500';
 	});
-
-	if (allImages.length) {
-		const latest = allImages.reduce((curr, img) => (img.created_at > curr.created_at ? img : curr));
-		latestImage = latest;
-		timestamp = toTimestamp(latest.created_at);
-	}
-
 	// build slots from movein / moveout / repair
 	const imageSlots: GroupImageSlot[] = [
 		{ label: 'Move-in', imageUrl: movein?.url ?? null },

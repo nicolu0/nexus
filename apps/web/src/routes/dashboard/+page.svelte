@@ -50,21 +50,6 @@
 	let unitError = $state('');
 	let unitPanelFullscreen = $state(false);
 
-	const UNIT_IMAGES_BUCKET = 'unit-images';
-
-	const createSectionForm = () => ({
-		label: ''
-	});
-
-	let showSectionModal = $state(false);
-	let sectionForm = $state(createSectionForm());
-	let sectionError = $state('');
-	let sectionSubmitting = $state(false);
-	let sectionUnitLabel = $state('');
-	let sectionPropertyName = $state('');
-	let sectionTargetUnitId = $state<string | null>(null);
-	let sectionTargetPropertyId = $state<string | null>(null);
-
 	const loadProperties = async () => {
 		isLoading = true;
 		try {
@@ -81,7 +66,7 @@
 				(propertyRows ?? []).map(async (property, idx) => {
 					const { data: unitRows, error: unitsError } = await supabase
 						.from('units')
-						.select(`id, unit_number`)
+						.select(`id, unit_number, stage`)
 						.eq('property_id', property.id);
 
 					if (unitsError) {
@@ -130,7 +115,7 @@
 						units: (unitRows ?? []).map((unit, unitIndex) => ({
 							id: unit.id,
 							label: unit.unit_number ?? `Unit ${unitIndex + 1}`,
-							sections: sectionsByUnit.get(unit.id) ?? []
+							stage: unit.stage
 						}))
 					};
 				})
@@ -144,6 +129,24 @@
 			isLoading = false;
 		}
 	};
+	type StageValue = 'Vacant' | 'Move-in' | 'Move-out';
+
+	function handleUnitStageChange(next: StageValue) {
+		if (!selectedUnit) return;
+		const unitId = selectedUnit.id;
+
+		// update the selectedUnit object
+		selectedUnit = {
+			...selectedUnit,
+			stage: next
+		};
+
+		// update the matching unit inside properties → units
+		properties = properties.map((property) => ({
+			...property,
+			units: property.units.map((unit) => (unit.id === unitId ? { ...unit, stage: next } : unit))
+		}));
+	}
 
 	onMount(() => {
 		void loadProperties();
@@ -321,10 +324,6 @@
 
 	const handleDashboardKeydown = (event: KeyboardEvent) => {
 		if (event.key !== 'Escape') return;
-		if (showSectionModal) {
-			event.preventDefault();
-			return;
-		}
 		if (showUnitModal) {
 			event.preventDefault();
 			closeUnitModal();
@@ -383,6 +382,7 @@
 				selectedProperty = null;
 				unitPanelFullscreen = false;
 			}}
+			onStageChange={handleUnitStageChange}
 		/>
 	</div>
 </div>

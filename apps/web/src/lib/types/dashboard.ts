@@ -7,6 +7,7 @@ export type Triplet = {
 export type UnitSummary = {
 	id: string;
 	label: string;
+	stage: string;
 };
 
 export type Section = {
