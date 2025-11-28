@@ -139,139 +139,147 @@ export default function DashboardScreen() {
     useFocusEffect(
         React.useCallback(() => {
             setStatusBarStyle('dark');
+            loadDashboard();
+
+            return () => {
+                setShowPropertyMenu(false);
+            };
         }, [])
     );
 
-    useEffect(() => {
-        async function loadDashboard() {
-            try {
-                setLoading(true);
-
-                const {
-                    data: { user },
-                    error: userError,
-                } = await supabase.auth.getUser();
-                if (userError) throw userError;
-                if (!user) {
-                    setProperties([]);
-                    setGroups([]);
-                    return;
-                }
-
-                // 1) Properties → units → tenancies
-                const { data: propsData, error: propsError } = await supabase
-                    .from('properties')
-                    .select(`
-            id,
-            name,
-            address_line1,
-            city,
-            state,
-            latitude,
-            longitude,
-            units:units (
-              id,
-              unit_number,
-              tenancies:tenancies (
-                id,
-                tenant_name,
-                lease_start_date,
-                move_out_date
-              )
-            )
-          `)
-                    .eq('owner_id', user.id)
-                    .order('name', { ascending: true });
-
-                if (propsError) throw propsError;
-
-                const castProps = (propsData ?? []) as any as Property[];
-                setProperties(castProps);
-
-                if (!selectedPropertyId && castProps.length > 0) {
-                    // Default to first, but try to find closest
-                    let bestId = castProps[0].id;
-
-                    try {
-                        const { status } = await Location.requestForegroundPermissionsAsync();
-                        if (status === 'granted') {
-                            const loc = await Location.getCurrentPositionAsync({});
-                            const { latitude, longitude } = loc.coords;
-
-                            let minDist = Infinity;
-
-                            castProps.forEach(p => {
-                                if (p.latitude && p.longitude) {
-                                    const dist = getDistanceFromLatLonInKm(latitude, longitude, p.latitude, p.longitude);
-                                    if (dist < minDist) {
-                                        minDist = dist;
-                                        bestId = p.id;
-                                    }
-                                }
-                            });
-                        }
-                    } catch (e) {
-                        console.log('Location error in dashboard, using default property', e);
-                    }
-
-                    setSelectedPropertyId(bestId);
-                }
-
-                // 2) Collect tenancy IDs
-                const tenancyIds: string[] = [];
-                castProps.forEach((p) =>
-                    (p.units ?? []).forEach((u) =>
-                        (u.tenancies ?? []).forEach((t) => tenancyIds.push(t.id))
-                    )
-                );
-
-                if (tenancyIds.length === 0) {
-                    setGroups([]);
-                    setTenancyMoveOutMap({});
-                    return;
-                }
-
-                // 3) Fetch groups + images + room
-                const { data: groupData, error: groupsError } = await supabase
-                    .from('groups')
-                    .select(`
-            id,
-            name,
-            tenancy_id,
-            description,
-            room:rooms (
-              id,
-              name
-            ),
-            images (
-              id,
-              phase,
-              path
-            )
-          `)
-                    .in('tenancy_id', tenancyIds);
-
-                if (groupsError) throw groupsError;
-
-                const castGroups = (groupData ?? []) as any as GroupRow[];
-                setGroups(castGroups);
-
-                // 4) Build tenancy -> hasMoveOutPhoto map
-                const moveOutMap: Record<string, boolean> = {};
-                castGroups.forEach((g) => {
-                    if (!g.tenancy_id) return;
-                    const hasMoveOut =
-                        g.images?.some((img) => img.phase === 'move_out') ?? false;
-                    if (hasMoveOut) moveOutMap[g.tenancy_id] = true;
-                });
-                setTenancyMoveOutMap(moveOutMap);
-            } catch (err) {
-                console.error('Error loading dashboard:', err);
-            } finally {
+    const loadDashboard = async () => {
+        try {
+            // Don't set loading to true here if we want background refresh
+            // or manage a separate refreshing state if using pull-to-refresh
+            
+            const {
+                data: { user },
+                error: userError,
+            } = await supabase.auth.getUser();
+            if (userError) throw userError;
+            if (!user) {
+                setProperties([]);
+                setGroups([]);
                 setLoading(false);
+                return;
             }
-        }
 
+            // 1) Properties → units → tenancies
+            const { data: propsData, error: propsError } = await supabase
+                .from('properties')
+                .select(`
+        id,
+        name,
+        address_line1,
+        city,
+        state,
+        latitude,
+        longitude,
+        units:units (
+          id,
+          unit_number,
+          tenancies:tenancies (
+            id,
+            tenant_name,
+            lease_start_date,
+            move_out_date
+          )
+        )
+      `)
+                .eq('owner_id', user.id)
+                .order('name', { ascending: true });
+
+            if (propsError) throw propsError;
+
+            const castProps = (propsData ?? []) as any as Property[];
+            setProperties(castProps);
+
+            if (!selectedPropertyId && castProps.length > 0) {
+                // Default to first, but try to find closest
+                let bestId = castProps[0].id;
+
+                try {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        const loc = await Location.getCurrentPositionAsync({});
+                        const { latitude, longitude } = loc.coords;
+
+                        let minDist = Infinity;
+
+                        castProps.forEach(p => {
+                            if (p.latitude && p.longitude) {
+                                const dist = getDistanceFromLatLonInKm(latitude, longitude, p.latitude, p.longitude);
+                                if (dist < minDist) {
+                                    minDist = dist;
+                                    bestId = p.id;
+                                }
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.log('Location error in dashboard, using default property', e);
+                }
+
+                setSelectedPropertyId(bestId);
+            }
+
+            // 2) Collect tenancy IDs
+            const tenancyIds: string[] = [];
+            castProps.forEach((p) =>
+                (p.units ?? []).forEach((u) =>
+                    (u.tenancies ?? []).forEach((t) => tenancyIds.push(t.id))
+                )
+            );
+
+            if (tenancyIds.length === 0) {
+                setGroups([]);
+                setTenancyMoveOutMap({});
+                setLoading(false);
+                return;
+            }
+
+            // 3) Fetch groups + images + room
+            const { data: groupData, error: groupsError } = await supabase
+                .from('groups')
+                .select(`
+        id,
+        name,
+        tenancy_id,
+        description,
+        room:rooms (
+          id,
+          name
+        ),
+        images (
+          id,
+          phase,
+          path
+        )
+      `)
+                .in('tenancy_id', tenancyIds);
+
+            if (groupsError) throw groupsError;
+
+            const castGroups = (groupData ?? []) as any as GroupRow[];
+            setGroups(castGroups);
+
+            // 4) Build tenancy -> hasMoveOutPhoto map
+            const moveOutMap: Record<string, boolean> = {};
+            castGroups.forEach((g) => {
+                if (!g.tenancy_id) return;
+                const hasMoveOut =
+                    g.images?.some((img) => img.phase === 'move_out') ?? false;
+                if (hasMoveOut) moveOutMap[g.tenancy_id] = true;
+            });
+            setTenancyMoveOutMap(moveOutMap);
+        } catch (err) {
+            console.error('Error loading dashboard:', err);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
         loadDashboard();
     }, []);
 
@@ -370,11 +378,13 @@ export default function DashboardScreen() {
 
     function stageBadges(images: ImageRow[] | null | undefined) {
         const phases = new Set(images?.map((i) => i.phase));
+        // Filter out inactive badges
         const badges: { label: string; active: boolean }[] = [
             { label: 'Move-in', active: phases.has('move_in') },
             { label: 'Move-out', active: phases.has('move_out') },
             { label: 'Repair', active: phases.has('repair') },
-        ];
+        ].filter((b) => b.active);
+        
         return badges;
     }
 
@@ -423,7 +433,7 @@ export default function DashboardScreen() {
                     <View className="relative">
                         <TouchableOpacity
                             onPress={() => setShowPropertyMenu((prev) => !prev)}
-                            className="flex-row items-center bg-white rounded-full px-3 py-1.5 border border-gray-300 shadow-sm"
+                            className="flex-row items-center bg-white rounded-full px-3 py-1.5 border border-gray-200"
                         >
                             <Text
                                 numberOfLines={1}
@@ -439,7 +449,7 @@ export default function DashboardScreen() {
                         </TouchableOpacity>
 
                         {showPropertyMenu && (
-                            <View className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
+                            <View className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl border border-gray-200 z-50">
                                 <ScrollView
                                     className="max-h-72"
                                     showsVerticalScrollIndicator={false}
@@ -519,8 +529,9 @@ export default function DashboardScreen() {
                                     setSelectedUnitId(unit.id);
                                     setRoomFilterId(null);
                                     setUnitModalVisible(true);
+                                    setShowPropertyMenu(false);
                                 }}
-                                className="mb-3 p-3 rounded-xl bg-white border border-gray-200 shadow-sm"
+                                className="mb-3 p-3 rounded-xl bg-white border border-gray-200"
                             >
                                 <View className="flex-row justify-between items-center">
                                     <View className="flex-1 pr-2">
@@ -607,52 +618,54 @@ export default function DashboardScreen() {
                             <>
                                 {/* Room filters */}
                                 {roomFilters.length > 0 && (
-                                    <ScrollView
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        className="px-4 pt-2 pb-2 border-b border-gray-100"
-                                    >
-                                        <TouchableOpacity
-                                            onPress={() => setRoomFilterId(null)}
-                                            className={`px-3 py-1 rounded-full mr-2 border ${roomFilterId === null
-                                                ? 'bg-blue-600 border-blue-600'
-                                                : 'bg-white border-gray-200'
-                                                }`}
+                                    <View>
+                                        <ScrollView
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            className="px-4 py-2 border-b border-gray-100 grow-0"
                                         >
-                                            <Text
-                                                className={`text-xs ${roomFilterId === null
-                                                    ? 'text-white'
-                                                    : 'text-gray-700'
-                                                    }`}
-                                            >
-                                                All rooms
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        {roomFilters.map((room) => (
                                             <TouchableOpacity
-                                                key={room.id}
-                                                onPress={() =>
-                                                    setRoomFilterId((prev) =>
-                                                        prev === room.id ? null : room.id
-                                                    )
-                                                }
-                                                className={`px-3 py-1 rounded-full mr-2 border ${roomFilterId === room.id
+                                                onPress={() => setRoomFilterId(null)}
+                                                className={`px-3 py-1 rounded-full mr-2 border ${roomFilterId === null
                                                     ? 'bg-blue-600 border-blue-600'
                                                     : 'bg-white border-gray-200'
                                                     }`}
                                             >
                                                 <Text
-                                                    className={`text-xs ${roomFilterId === room.id
+                                                    className={`text-xs ${roomFilterId === null
                                                         ? 'text-white'
                                                         : 'text-gray-700'
                                                         }`}
                                                 >
-                                                    {room.name}
+                                                    All rooms
                                                 </Text>
                                             </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
+
+                                            {roomFilters.map((room) => (
+                                                <TouchableOpacity
+                                                    key={room.id}
+                                                    onPress={() =>
+                                                        setRoomFilterId((prev) =>
+                                                            prev === room.id ? null : room.id
+                                                        )
+                                                    }
+                                                    className={`px-3 py-1 rounded-full mr-2 border ${roomFilterId === room.id
+                                                        ? 'bg-blue-600 border-blue-600'
+                                                        : 'bg-white border-gray-200'
+                                                        }`}
+                                                >
+                                                    <Text
+                                                        className={`text-xs ${roomFilterId === room.id
+                                                            ? 'text-white'
+                                                            : 'text-gray-700'
+                                                            }`}
+                                                    >
+                                                        {room.name}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
                                 )}
 
                                 {/* Groups grid */}
@@ -665,6 +678,7 @@ export default function DashboardScreen() {
                                     </View>
                                 ) : (
                                     <FlatList
+                                        className="flex-1"
                                         contentContainerStyle={{
                                             paddingHorizontal: 8,
                                             paddingTop: 8,
@@ -720,17 +734,9 @@ export default function DashboardScreen() {
                                                                 {badges.map((b) => (
                                                                     <View
                                                                         key={b.label}
-                                                                        className={`px-1.5 py-0.5 mr-1 mb-1 rounded-full border ${b.active
-                                                                            ? 'bg-emerald-50 border-emerald-300'
-                                                                            : 'bg-gray-50 border-gray-200'
-                                                                            }`}
+                                                                        className="px-1.5 py-0.5 mr-1 mb-1 rounded-full border bg-gray-50 border-gray-200"
                                                                     >
-                                                                        <Text
-                                                                            className={`text-[9px] ${b.active
-                                                                                ? 'text-emerald-800'
-                                                                                : 'text-gray-500'
-                                                                                }`}
-                                                                        >
+                                                                        <Text className="text-[9px] text-gray-500">
                                                                             {b.label}
                                                                         </Text>
                                                                     </View>
