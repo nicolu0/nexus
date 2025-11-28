@@ -4,6 +4,7 @@
 	import Group from '../sm/Group.svelte';
 	import supabase from '$lib/supabaseClient';
 	import StatusDot from '../sm/StatusDot.svelte';
+	import GroupModal from '../modals/GroupModal.svelte';
 
 	const noop = () => {};
 
@@ -78,7 +79,26 @@
 
 	// ---------- GROUPS LOADING ----------
 
-	async function loadGroups(unitId: string) {
+	type GroupImage = {
+		id: string;
+		url: string;
+		created_at: string;
+		phase: 'move_in' | 'move_out' | 'repair';
+		notes?: string | null;
+	};
+
+	type EnrichedGroup = {
+		id: string;
+		name: string;
+		room: string;
+		description?: string | null;
+		tenancy_id?: string | null;
+		movein: GroupImage | null;
+		moveout: GroupImage | null;
+		repair: GroupImage | null;
+	};
+
+	async function loadGroups(unitId: string): Promise<EnrichedGroup[]> {
 		const { data, error } = await supabase
 			.from('groups')
 			.select(
@@ -122,13 +142,8 @@
 		return enriched;
 	}
 
-	$effect(() => {
-		if (!selectedUnit) return;
-		loadGroups(selectedUnit.id).then((enrichedGroups) => (groups = enrichedGroups));
-	});
-
-	let groups = $state<any[]>([]);
-	let selectedGroup = $state(null);
+	let groups = $state<EnrichedGroup[]>([]);
+	let selectedGroup = $state<EnrichedGroup | null>(null);
 
 	let groupSearch = $state('');
 
@@ -144,6 +159,12 @@
 					);
 				})
 	);
+
+	$effect(() => {
+		if (!selectedUnit) return;
+		selectedGroup = null;
+		loadGroups(selectedUnit.id).then((enrichedGroups) => (groups = enrichedGroups));
+	});
 </script>
 
 {#if selectedUnit}
@@ -295,6 +316,10 @@
 			</div>
 		</div>
 	</div>
+{/if}
+
+{#if selectedGroup}
+	<GroupModal selectedGroup={selectedGroup} onClose={() => (selectedGroup = null)} />
 {/if}
 
 <style>
