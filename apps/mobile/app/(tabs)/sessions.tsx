@@ -198,7 +198,7 @@ export default function SessionsScreen() {
 
         return (
             <TouchableOpacity
-                className="mb-3 mx-4 rounded-xl bg-white border border-stone-200 shadow-sm px-4 py-3"
+                className="mb-3 mx-4 rounded-xl bg-white border border-gray-200 px-4 py-3"
                 onPress={() => openSession(item)}
             >
                 {/* First row: phase + status pill */}
@@ -328,7 +328,7 @@ export default function SessionsScreen() {
                         refreshControl={
                             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                         }
-                        contentContainerStyle={{ paddingBottom: 16 }}
+                        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
                     />
                 )}
 
