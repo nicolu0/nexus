@@ -12,6 +12,7 @@ import {
     StyleSheet,
     Animated,
     Easing,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -56,6 +57,7 @@ export default function SessionsScreen() {
     const insets = useSafeAreaInsets();
 
     const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
+    const [sessionRoomFilter, setSessionRoomFilter] = useState<string | null>(null);
 
     const screenWidth = Dimensions.get('window').width;
     const slideAnim = React.useRef(new Animated.Value(screenWidth)).current;
@@ -79,7 +81,7 @@ export default function SessionsScreen() {
             }).start();
         }
     }, [selectedSession, slideAnim, screenWidth]);
-    const [sessionImages, setSessionImages] = useState<{ id: string; path: string }[]>([]);
+    const [sessionImages, setSessionImages] = useState<{ id: string; path: string; groups: { name: string } | null }[]>([]);
     const [loadingImages, setLoadingImages] = useState(false);
 
     const phaseLabel = (phase: SessionPhase) => {
@@ -174,11 +176,18 @@ export default function SessionsScreen() {
             // Fetch images directly from images table using session_id
             const { data, error } = await supabase
                 .from('images')
-                .select('id, path')
+                .select(`
+                    id, 
+                    path,
+                    groups (
+                        name
+                    )
+                `)
                 .eq('session_id', sessionId);
 
             if (error) throw error;
 
+            // @ts-ignore - join types
             setSessionImages(data || []);
         } catch (e) {
             console.error('Error fetching session images:', e);
@@ -189,12 +198,14 @@ export default function SessionsScreen() {
 
     const openSession = (session: SessionRow) => {
         setSelectedSession(session);
+        setSessionRoomFilter(null);
         fetchSessionImages(session.id);
     };
 
     const closeSession = () => {
         setSelectedSession(null);
         setSessionImages([]);
+        setSessionRoomFilter(null);
     };
 
     const onRefresh = useCallback(async () => {
@@ -209,6 +220,22 @@ export default function SessionsScreen() {
         if (filter === 'completed') return s.status === 'completed';
         return true;
     });
+
+    // Session Room Filter Logic
+    const sessionRoomFilters = React.useMemo(() => {
+        const rooms = new Set<string>();
+        sessionImages.forEach(img => {
+            if (img.groups?.name) {
+                rooms.add(img.groups.name);
+            }
+        });
+        return Array.from(rooms).sort();
+    }, [sessionImages]);
+
+    const filteredSessionImages = React.useMemo(() => {
+        if (!sessionRoomFilter) return sessionImages;
+        return sessionImages.filter(img => img.groups?.name === sessionRoomFilter);
+    }, [sessionImages, sessionRoomFilter]);
 
     const renderFilterChip = (value: Filter, label: string) => {
         const active = filter === value;
@@ -407,6 +434,58 @@ export default function SessionsScreen() {
                             </View>
                         </View>
 
+                        {/* Room Filters */}
+                        {sessionRoomFilters.length > 0 && (
+                            <View>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    className="px-4 py-2 border-b border-gray-100 grow-0 bg-white"
+                                >
+                                    <TouchableOpacity
+                                        onPress={() => setSessionRoomFilter(null)}
+                                        className={`px-3 py-1 rounded-full mr-2 border ${sessionRoomFilter === null
+                                            ? 'bg-blue-600 border-blue-600'
+                                            : 'bg-white border-gray-200'
+                                            }`}
+                                    >
+                                        <Text
+                                            className={`text-xs ${sessionRoomFilter === null
+                                                ? 'text-white'
+                                                : 'text-gray-700'
+                                                }`}
+                                        >
+                                            All rooms
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {sessionRoomFilters.map((room) => (
+                                        <TouchableOpacity
+                                            key={room}
+                                            onPress={() =>
+                                                setSessionRoomFilter((prev) =>
+                                                    prev === room ? null : room
+                                                )
+                                            }
+                                            className={`px-3 py-1 rounded-full mr-2 border ${sessionRoomFilter === room
+                                                ? 'bg-blue-600 border-blue-600'
+                                                : 'bg-white border-gray-200'
+                                                }`}
+                                        >
+                                            <Text
+                                                className={`text-xs ${sessionRoomFilter === room
+                                                    ? 'text-white'
+                                                    : 'text-gray-700'
+                                                    }`}
+                                            >
+                                                {room}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
                         {loadingImages ? (
                             <View className="flex-1 justify-center items-center">
                                 <ActivityIndicator size="large" />
@@ -420,7 +499,7 @@ export default function SessionsScreen() {
                             </View>
                         ) : (
                             <FlatList
-                                data={sessionImages}
+                                data={filteredSessionImages}
                                 keyExtractor={(item) => item.id}
                                 numColumns={3}
                                 contentContainerStyle={{ padding: 2, paddingBottom: insets.bottom + 70 }}
@@ -430,12 +509,19 @@ export default function SessionsScreen() {
                                         .getPublicUrl(item.path).data.publicUrl;
                                     
                                     return (
-                                        <View className="w-1/3 aspect-square p-0.5">
+                                        <View className="w-1/3 aspect-square p-0.5 relative">
                                             <Image
                                                 source={{ uri: publicUrl }}
                                                 className="w-full h-full bg-stone-200"
                                                 resizeMode="cover"
                                             />
+                                            {item.groups?.name && (
+                                                <View className="absolute top-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded">
+                                                    <Text className="text-[9px] text-white font-medium">
+                                                        {item.groups.name}
+                                                    </Text>
+                                                </View>
+                                            )}
                                         </View>
                                     );
                                 }}
