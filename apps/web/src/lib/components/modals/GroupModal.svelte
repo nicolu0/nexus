@@ -58,7 +58,7 @@
 		onclick={onClose}
 	>
 		<div
-			class="w-full max-w-5xl rounded-2xl bg-white p-6 text-left shadow-2xl"
+			class="w-full max-w-5xl rounded-xl bg-white p-6 text-left shadow-2xl"
 			onclick={stopPropagation}
 		>
 			<div class="flex items-start justify-between gap-4">

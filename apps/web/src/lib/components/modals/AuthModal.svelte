@@ -41,7 +41,7 @@
 >
 	<div
 		in:scale={{ start: 0.9, duration: 200 }}
-		class="w-full max-w-sm rounded-3xl border border-stone-200 bg-white p-6 text-stone-800 shadow-[0_12px_32px_rgba(15,15,15,0.12)]"
+		class="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-6 text-stone-800 shadow-[0_12px_32px_rgba(15,15,15,0.12)]"
 	>
 		<div class="flex items-center justify-between">
 			<div class="text-sm font-semibold tracking-tight text-stone-900">
@@ -66,34 +66,34 @@
 		<form class="mt-5 space-y-4" on:submit={submitEmail}>
 			<label class="block text-xs font-semibold tracking-wide text-stone-500 uppercase">
 				Email
-					<input
-						type="email"
-						required
-						class="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm transition outline-none placeholder:text-stone-400 focus:border-stone-400"
-						placeholder="you@example.com"
-						value={email}
-						on:input={(event) => {
-							const target = event.target as HTMLInputElement;
-							onEmailChange(target.value);
-						}}
-						autocomplete="email"
-					/>
-				</label>
-				<label class="block text-xs font-semibold tracking-wide text-stone-500 uppercase">
-					Password
-					<input
-						type="password"
+				<input
+					type="email"
 					required
-						minlength="8"
-						class="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm transition outline-none placeholder:text-stone-400 focus:border-stone-400"
-						placeholder="••••••••"
-						value={password}
-						on:input={(event) => {
-							const target = event.target as HTMLInputElement;
-							onPasswordChange(target.value);
-						}}
-						autocomplete="new-password"
-					/>
+					class="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm transition outline-none placeholder:text-stone-400 focus:border-stone-400"
+					placeholder="you@example.com"
+					value={email}
+					on:input={(event) => {
+						const target = event.target as HTMLInputElement;
+						onEmailChange(target.value);
+					}}
+					autocomplete="email"
+				/>
+			</label>
+			<label class="block text-xs font-semibold tracking-wide text-stone-500 uppercase">
+				Password
+				<input
+					type="password"
+					required
+					minlength="8"
+					class="mt-1 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm transition outline-none placeholder:text-stone-400 focus:border-stone-400"
+					placeholder="••••••••"
+					value={password}
+					on:input={(event) => {
+						const target = event.target as HTMLInputElement;
+						onPasswordChange(target.value);
+					}}
+					autocomplete="new-password"
+				/>
 			</label>
 			{#if errorMessage}
 				<p class="text-sm text-rose-600" aria-live="assertive">{errorMessage}</p>

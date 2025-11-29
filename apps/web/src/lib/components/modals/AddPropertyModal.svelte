@@ -27,9 +27,9 @@
 
 <div
 	class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-10"
-	on:click={onClose}
+	onclick={onClose}
 >
-	<div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" on:click|stopPropagation>
+	<div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
 		<h2 class="flex flex-row items-center gap-2 text-xl font-semibold text-stone-900">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -49,7 +49,7 @@
 			<p class="mt-4 rounded-lg bg-rose-100 px-3 py-2 text-sm text-rose-900">{propertyError}</p>
 		{/if}
 
-		<form class="mt-4 flex flex-col gap-4" on:submit={onSubmit}>
+		<form class="mt-4 flex flex-col gap-4" onsubmit={onSubmit}>
 			<label class="flex flex-col gap-1 text-xs font-medium text-stone-500">
 				<span>Property name</span>
 				<input
@@ -99,7 +99,7 @@
 				<button
 					type="button"
 					class="rounded-lg border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
-					on:click={onClose}
+					onclick={onClose}
 					disabled={propertySubmitting}
 				>
 					Cancel
