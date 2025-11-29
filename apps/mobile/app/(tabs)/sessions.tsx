@@ -6,19 +6,13 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
-    Modal,
-    Image,
-    Dimensions,
-    StyleSheet,
-    Animated,
-    Easing,
-    ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { setStatusBarStyle } from 'expo-status-bar';
+import { SessionSidePanel } from '../../components/lg/SessionSidePanel';
 
 type SessionStatus = 'in_progress' | 'completed' | 'abandoned' | string;
 type SessionPhase = string;
@@ -58,29 +52,6 @@ export default function SessionsScreen() {
 
     const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
     const [sessionRoomFilter, setSessionRoomFilter] = useState<string | null>(null);
-
-    const screenWidth = Dimensions.get('window').width;
-    const slideAnim = React.useRef(new Animated.Value(screenWidth)).current;
-
-    useEffect(() => {
-        if (selectedSession) {
-            // Slide in
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 150,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.ease),
-            }).start();
-        } else {
-            // Slide out
-            Animated.timing(slideAnim, {
-                toValue: screenWidth,
-                duration: 150,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.ease),
-            }).start();
-        }
-    }, [selectedSession, slideAnim, screenWidth]);
     const [sessionImages, setSessionImages] = useState<{ id: string; path: string; groups: { name: string } | null }[]>([]);
     const [loadingImages, setLoadingImages] = useState(false);
 
@@ -220,22 +191,6 @@ export default function SessionsScreen() {
         if (filter === 'completed') return s.status === 'completed';
         return true;
     });
-
-    // Session Room Filter Logic
-    const sessionRoomFilters = React.useMemo(() => {
-        const rooms = new Set<string>();
-        sessionImages.forEach(img => {
-            if (img.groups?.name) {
-                rooms.add(img.groups.name);
-            }
-        });
-        return Array.from(rooms).sort();
-    }, [sessionImages]);
-
-    const filteredSessionImages = React.useMemo(() => {
-        if (!sessionRoomFilter) return sessionImages;
-        return sessionImages.filter(img => img.groups?.name === sessionRoomFilter);
-    }, [sessionImages, sessionRoomFilter]);
 
     const renderFilterChip = (value: Filter, label: string) => {
         const active = filter === value;
@@ -400,135 +355,15 @@ export default function SessionsScreen() {
                 )}
 
                 {/* Session Images Side Panel (Replaces Modal) */}
-                <Animated.View
-                    style={[
-                        StyleSheet.absoluteFill,
-                        { 
-                            transform: [{ translateX: slideAnim }],
-                            backgroundColor: 'white',
-                            zIndex: 50, // Ensure it sits on top of other content
-                        }
-                    ]}
-                >
-                    <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-                        <View className="px-4 pt-2 pb-3 border-b border-stone-200 flex-row items-center justify-between bg-white">
-                            <View className="flex-row items-center">
-                                <TouchableOpacity onPress={closeSession} className="mr-3">
-                                    <Ionicons name="chevron-back" size={24} color="#111827" />
-                                </TouchableOpacity>
-                                <View>
-                                    {selectedSession && (
-                                        <>
-                                            <Text className="text-lg font-semibold text-black">
-                                                {phaseLabel(selectedSession.phase)}
-                                            </Text>
-                                            <Text className="text-xs text-gray-500">
-                                                {selectedSession.tenancies?.units?.properties?.name || 'Unknown Property'}
-                                                {selectedSession.tenancies?.units?.unit_number 
-                                                    ? ` · Unit ${selectedSession.tenancies.units.unit_number}` 
-                                                    : ''}
-                                            </Text>
-                                        </>
-                                    )}
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Room Filters */}
-                        {sessionRoomFilters.length > 0 && (
-                            <View>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    className="px-4 py-2 border-b border-gray-100 grow-0 bg-white"
-                                >
-                                    <TouchableOpacity
-                                        onPress={() => setSessionRoomFilter(null)}
-                                        className={`px-3 py-1 rounded-full mr-2 border ${sessionRoomFilter === null
-                                            ? 'bg-blue-600 border-blue-600'
-                                            : 'bg-white border-gray-200'
-                                            }`}
-                                    >
-                                        <Text
-                                            className={`text-xs ${sessionRoomFilter === null
-                                                ? 'text-white'
-                                                : 'text-gray-700'
-                                                }`}
-                                        >
-                                            All rooms
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    {sessionRoomFilters.map((room) => (
-                                        <TouchableOpacity
-                                            key={room}
-                                            onPress={() =>
-                                                setSessionRoomFilter((prev) =>
-                                                    prev === room ? null : room
-                                                )
-                                            }
-                                            className={`px-3 py-1 rounded-full mr-2 border ${sessionRoomFilter === room
-                                                ? 'bg-blue-600 border-blue-600'
-                                                : 'bg-white border-gray-200'
-                                                }`}
-                                        >
-                                            <Text
-                                                className={`text-xs ${sessionRoomFilter === room
-                                                    ? 'text-white'
-                                                    : 'text-gray-700'
-                                                    }`}
-                                            >
-                                                {room}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-                        )}
-
-                        {loadingImages ? (
-                            <View className="flex-1 justify-center items-center">
-                                <ActivityIndicator size="large" />
-                            </View>
-                        ) : sessionImages.length === 0 ? (
-                            <View className="flex-1 justify-center items-center px-8">
-                                <Ionicons name="images-outline" size={48} color="#d6d3d1" />
-                                <Text className="mt-4 text-stone-500 text-center">
-                                    No photos in this session yet.
-                                </Text>
-                            </View>
-                        ) : (
-                            <FlatList
-                                data={filteredSessionImages}
-                                keyExtractor={(item) => item.id}
-                                numColumns={3}
-                                contentContainerStyle={{ padding: 2, paddingBottom: insets.bottom + 70 }}
-                                renderItem={({ item }) => {
-                                    const publicUrl = supabase.storage
-                                        .from('unit-images')
-                                        .getPublicUrl(item.path).data.publicUrl;
-                                    
-                                    return (
-                                        <View className="w-1/3 aspect-square p-0.5 relative">
-                                            <Image
-                                                source={{ uri: publicUrl }}
-                                                className="w-full h-full bg-stone-200"
-                                                resizeMode="cover"
-                                            />
-                                            {item.groups?.name && (
-                                                <View className="absolute top-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded">
-                                                    <Text className="text-[9px] text-white font-medium">
-                                                        {item.groups.name}
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    );
-                                }}
-                            />
-                        )}
-                    </View>
-                </Animated.View>
+                <SessionSidePanel
+                    selectedSession={selectedSession}
+                    onClose={closeSession}
+                    loadingImages={loadingImages}
+                    sessionImages={sessionImages}
+                    sessionRoomFilter={sessionRoomFilter}
+                    setSessionRoomFilter={setSessionRoomFilter}
+                    phaseLabel={phaseLabel}
+                />
             </SafeAreaView>
         </View>
     );

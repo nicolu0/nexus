@@ -5,20 +5,15 @@ import {
     ScrollView,
     TouchableOpacity,
     ActivityIndicator,
-    FlatList,
-    Image,
-    // Modal, // Removed
-    Animated,
-    Dimensions,
-    StyleSheet,
-    Easing,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
 import { setStatusBarStyle } from 'expo-status-bar';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
+import { PropertyDropdown } from '../../components/sm/PropertyDropdown';
+import { UnitSidePanel } from '../../components/lg/UnitSidePanel';
+import { UnitList } from '../../components/md/UnitList';
 
 type Tenancy = {
     id: string;
@@ -49,12 +44,11 @@ type Room = {
     name: string;
 };
 
-    type ImageRow = {
-        id: string;
-        // phase: 'move_in' | 'move_out' | 'repair'; // removed
-        path: string;
-        session?: { phase: string } | null;
-    };
+type ImageRow = {
+    id: string;
+    path: string;
+    session?: { phase: string } | null;
+};
 
 type GroupRow = {
     id: string;
@@ -127,6 +121,7 @@ let hasAutoSelected = false;
 
 export default function DashboardScreen() {
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [properties, setProperties] = useState<Property[]>([]);
     const [groups, setGroups] = useState<GroupRow[]>([]);
     const [activeSessionsMap, setActiveSessionsMap] = useState<Record<string, string>>({});
@@ -143,32 +138,8 @@ export default function DashboardScreen() {
     const [roomFilterId, setRoomFilterId] = useState<string | null>(null);
     const [unitModalVisible, setUnitModalVisible] = useState(false);
 
-    const router = useRouter();
     const insets = useSafeAreaInsets();
     
-    const screenWidth = Dimensions.get('window').width;
-    const slideAnim = React.useRef(new Animated.Value(screenWidth)).current;
-
-    useEffect(() => {
-        if (unitModalVisible) {
-            // Slide in
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 150,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.ease),
-            }).start();
-        } else {
-            // Slide out
-            Animated.timing(slideAnim, {
-                toValue: screenWidth,
-                duration: 150,
-                useNativeDriver: true,
-                easing: Easing.out(Easing.ease),
-            }).start();
-        }
-    }, [unitModalVisible, slideAnim, screenWidth]);
-
     useFocusEffect(
         React.useCallback(() => {
             setStatusBarStyle('dark');
@@ -277,22 +248,22 @@ export default function DashboardScreen() {
             const { data: groupData, error: groupsError } = await supabase
                 .from('groups')
                 .select(`
-        id,
-        name,
-        tenancy_id,
-        description,
-        room:rooms (
-          id,
-          name
-        ),
-        images (
-          id,
-          path,
-          session:sessions (
-            phase
-          )
-        )
-      `)
+                    id,
+                    name,
+                    tenancy_id,
+                    description,
+                    room:rooms (
+                    id,
+                    name
+                    ),
+                    images (
+                    id,
+                    path,
+                    session:sessions (
+                        phase
+                    )
+                    )
+                `)
                 .in('tenancy_id', tenancyIds);
 
             if (groupsError) throw groupsError;
@@ -333,6 +304,12 @@ export default function DashboardScreen() {
             setLoading(false);
         }
     }
+
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        await loadDashboard();
+        setRefreshing(false);
+    }, []);
 
     useEffect(() => {
         loadDashboard();
@@ -418,31 +395,6 @@ export default function DashboardScreen() {
         return Array.from(map.values());
     }, [selectedUnitMeta, groups]);
 
-    function statusChipColor(status: TenancyStatus) {
-        switch (status) {
-            case 'Upcoming':
-                return 'bg-amber-100 text-amber-800';
-            case 'Active':
-                return 'bg-emerald-100 text-emerald-800';
-            case 'Vacated':
-                return 'bg-slate-200 text-slate-800';
-            default:
-                return 'bg-gray-100 text-gray-500';
-        }
-    }
-
-    function stageBadges(images: ImageRow[] | null | undefined) {
-        const phases = new Set(images?.map((i) => i.session?.phase));
-        // Filter out inactive badges
-        const badges: { label: string; active: boolean }[] = [
-            { label: 'Move-in', active: phases.has('move_in') },
-            { label: 'Move-out', active: phases.has('move_out') },
-            { label: 'Repair', active: phases.has('repair') },
-        ].filter((b) => b.active);
-        
-        return badges;
-    }
-
     function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
         var R = 6371; // Radius of the earth in km
         var dLat = deg2rad(lat2 - lat1);
@@ -485,408 +437,46 @@ export default function DashboardScreen() {
                     </View>
 
                     {/* Property dropdown (top-right) */}
-                    <View className="relative">
-                        <TouchableOpacity
-                            onPress={() => setShowPropertyMenu((prev) => !prev)}
-                            className="flex-row items-center bg-white rounded-full px-3 py-1.5 border border-gray-200"
-                        >
-                            <Text
-                                numberOfLines={1}
-                                className="text-sm text-gray-800 max-w-[160px] mr-1"
-                            >
-                                {selectedProperty?.name || 'Select property'}
-                            </Text>
-                            <Ionicons
-                                name={showPropertyMenu ? 'chevron-up' : 'chevron-down'}
-                                size={16}
-                                color="#4b5563"
-                            />
-                        </TouchableOpacity>
-
-                        {showPropertyMenu && (
-                            <View className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl border border-gray-200 z-50">
-                                <ScrollView
-                                    className="max-h-72"
-                                    showsVerticalScrollIndicator={false}
-                                >
-                                    {properties.map((prop) => (
-                                        <TouchableOpacity
-                                            key={prop.id}
-                                            onPress={() => {
-                                                setSelectedPropertyId(prop.id);
-                                                setShowPropertyMenu(false);
-                                                setSelectedUnitId(null);
-                                                setUnitModalVisible(false);
-                                            }}
-                                            className="px-4 py-3 border-b border-gray-100 last:border-b-0"
-                                        >
-                                            <Text
-                                                numberOfLines={1}
-                                                className={`text-sm ${selectedPropertyId === prop.id
-                                                    ? 'font-semibold text-blue-600'
-                                                    : 'text-gray-800'
-                                                    }`}
-                                            >
-                                                {prop.name}
-                                            </Text>
-                                            {prop.address_line1 && (
-                                                <Text
-                                                    numberOfLines={1}
-                                                    className="text-[11px] text-gray-500 mt-0.5"
-                                                >
-                                                    {prop.address_line1}
-                                                    {prop.city ? ` · ${prop.city}` : ''}
-                                                    {prop.state ? `, ${prop.state}` : ''}
-                                                </Text>
-                                            )}
-                                        </TouchableOpacity>
-                                    ))}
-                                    {properties.length === 0 && (
-                                        <View className="px-4 py-3">
-                                            <Text className="text-sm text-gray-500">
-                                                No properties yet.
-                                            </Text>
-                                        </View>
-                                    )}
-                                </ScrollView>
-                            </View>
-                        )}
-                    </View>
+                    <PropertyDropdown
+                        selectedProperty={selectedProperty}
+                        properties={properties}
+                        visible={showPropertyMenu}
+                        onToggle={() => setShowPropertyMenu((prev) => !prev)}
+                        onSelect={(propertyId: string) => {
+                            setSelectedPropertyId(propertyId);
+                            setShowPropertyMenu(false);
+                            setSelectedUnitId(null);
+                            setUnitModalVisible(false);
+                        }}
+                    />
                 </View>
 
                 {/* UNITS LIST FOR SELECTED PROPERTY */}
-                <ScrollView
-                    className="flex-1 px-4"
-                    contentContainerStyle={{ paddingBottom: insets.bottom + 70 }}
-                >
-                    {!selectedProperty && (
-                        <View className="mt-10 items-center">
-                            <Text className="text-sm text-gray-500 text-center">
-                                No property selected. Add a property on web or mobile, then
-                                refresh.
-                            </Text>
-                        </View>
-                    )}
-
-                    {selectedProperty && unitsForSelectedProperty.length === 0 && (
-                        <View className="mt-8 items-center">
-                            <Text className="text-sm text-gray-500 text-center">
-                                This property has no units yet.
-                            </Text>
-                        </View>
-                    )}
-
-                    {selectedProperty &&
-                        unitsForSelectedProperty.map(({ unit, tenancy, status }) => (
-                            <TouchableOpacity
-                                key={unit.id}
-                                onPress={() => {
-                                    setSelectedUnitId(unit.id);
-                                    setRoomFilterId(null);
-                                    setUnitModalVisible(true);
-                                    setShowPropertyMenu(false);
-                                }}
-                                className="mb-3 p-3 rounded-xl bg-white border border-gray-200"
-                            >
-                                <View className="flex-row justify-between items-center">
-                                    <View className="flex-1 pr-2">
-                                        <Text className="text-base font-semibold text-black">
-                                            Unit {unit.unit_number}
-                                        </Text>
-                                        {tenancy ? (
-                                            <Text
-                                                numberOfLines={1}
-                                                className="text-xs text-gray-500 mt-0.5"
-                                            >
-                                                {tenancy.tenant_name}
-                                            </Text>
-                                        ) : (
-                                            <Text className="text-xs text-gray-400 mt-0.5">
-                                                No tenancy
-                                            </Text>
-                                        )}
-                                    </View>
-                                    <View
-                                        className={`px-2 py-1 rounded-full ${statusChipColor(
-                                            status
-                                        )}`}
-                                    >
-                                        <Text className="text-[10px] font-semibold">
-                                            {status}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {tenancy && (
-                                    <Text className="mt-1 text-[11px] text-gray-400">
-                                        Start: {tenancy.lease_start_date}
-                                        {tenancy.move_out_date
-                                            ? ` · Move-out: ${tenancy.move_out_date}`
-                                            : ''}
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                </ScrollView>
+                <UnitList
+                    selectedProperty={selectedProperty}
+                    unitsForSelectedProperty={unitsForSelectedProperty}
+                    onSelectUnit={(unitId) => {
+                        setSelectedUnitId(unitId);
+                        setRoomFilterId(null);
+                        setUnitModalVisible(true);
+                        setShowPropertyMenu(false);
+                    }}
+                    insets={insets}
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                />
 
                 {/* UNIT SIDE PANEL (Replaces Modal) */}
-                <Animated.View
-                    style={[
-                        StyleSheet.absoluteFill,
-                        { 
-                            transform: [{ translateX: slideAnim }],
-                            backgroundColor: 'white',
-                            zIndex: 50, // Ensure it sits on top of other dashboard content
-                        }
-                    ]}
-                >
-                    <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-                        {/* Modal header */}
-                        <View className="px-4 pt-2 pb-3 border-b border-gray-200 flex-row items-center justify-between">
-                            <View className="flex-row items-center">
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setUnitModalVisible(false);
-                                        setRoomFilterId(null);
-                                    }}
-                                    className="mr-3"
-                                >
-                                    <Ionicons name="chevron-back" size={24} color="#111827" />
-                                </TouchableOpacity>
-                                <View>
-                                    {selectedUnitMeta && (
-                                        <>
-                                            <Text className="text-xs text-gray-500">
-                                                {selectedUnitMeta.property.name}
-                                            </Text>
-                                            <Text className="text-lg font-semibold text-black">
-                                                Unit {selectedUnitMeta.unit.unit_number}
-                                            </Text>
-                                            {selectedUnitMeta.tenancy && (
-                                                <Text className="text-xs text-gray-500">
-                                                    {selectedUnitMeta.tenancy.tenant_name}
-                                                </Text>
-                                            )}
-                                        </>
-                                    )}
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Room filter + groups */}
-                        {selectedUnitMeta ? (
-                            <>
-                                {/* Room filters */}
-                                {roomFilters.length > 0 && (
-                                    <View>
-                                        <ScrollView
-                                            horizontal
-                                            showsHorizontalScrollIndicator={false}
-                                            className="px-4 py-2 border-b border-gray-100 grow-0"
-                                        >
-                                            <TouchableOpacity
-                                                onPress={() => setRoomFilterId(null)}
-                                                className={`px-3 py-1 rounded-full mr-2 border ${roomFilterId === null
-                                                    ? 'bg-blue-600 border-blue-600'
-                                                    : 'bg-white border-gray-200'
-                                                    }`}
-                                            >
-                                                <Text
-                                                    className={`text-xs ${roomFilterId === null
-                                                        ? 'text-white'
-                                                        : 'text-gray-700'
-                                                        }`}
-                                                >
-                                                    All rooms
-                                                </Text>
-                                            </TouchableOpacity>
-
-                                            {roomFilters.map((room) => (
-                                                <TouchableOpacity
-                                                    key={room.id}
-                                                    onPress={() =>
-                                                        setRoomFilterId((prev) =>
-                                                            prev === room.id ? null : room.id
-                                                        )
-                                                    }
-                                                    className={`px-3 py-1 rounded-full mr-2 border ${roomFilterId === room.id
-                                                        ? 'bg-blue-600 border-blue-600'
-                                                        : 'bg-white border-gray-200'
-                                                        }`}
-                                                >
-                                                    <Text
-                                                        className={`text-xs ${roomFilterId === room.id
-                                                            ? 'text-white'
-                                                            : 'text-gray-700'
-                                                            }`}
-                                                    >
-                                                        {room.name}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-
-                                {/* Groups grid */}
-                                {selectedUnitGroups.length === 0 ? (
-                                    <View className="flex-1 justify-center items-center px-4">
-                                        {selectedUnitMeta?.tenancy?.id && activeSessionsMap[selectedUnitMeta.tenancy.id] ? (
-                                            <View className="items-center">
-                                                <Text className="text-sm text-gray-500 text-center mb-1">
-                                                    You already started a Session for this unit.
-                                                </Text>
-                                                <TouchableOpacity onPress={() => {
-                                                    setUnitModalVisible(false);
-                                                    router.push('/(tabs)/sessions');
-                                                }}>
-                                                    <Text className="text-sm font-semibold text-blue-600 text-center">
-                                                        View Session
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        ) : (
-                                            <>
-                                                <Text className="text-sm text-gray-500 text-center mb-4">
-                                                    No groups yet for this tenancy.
-                                                </Text>
-                                                {selectedUnitMeta?.tenancy?.lease_start_date && (
-                                                    <TouchableOpacity
-                                                        onPress={async () => {
-                                                            if (!selectedUnitMeta.tenancy) return;
-
-                                                            const phase = selectedUnitMeta.tenancy.lease_start_date < '2025-07-01'
-                                                                ? 'move_out'
-                                                                : 'move_in';
-
-                                                            setUnitModalVisible(false);
-
-                                                            try {
-                                                                const { data: sessionData, error: sessionError } = await supabase
-                                                                    .from('sessions')
-                                                                    .insert({
-                                                                        tenancy_id: selectedUnitMeta.tenancy.id,
-                                                                        phase: phase,
-                                                                        status: 'in_progress',
-                                                                        created_by: (await supabase.auth.getUser()).data.user?.id
-                                                                    })
-                                                                    .select('id')
-                                                                    .single();
-
-                                                                if (sessionError) throw sessionError;
-
-                                                                router.push({
-                                                                    pathname: '/(tabs)/camera',
-                                                                    params: {
-                                                                        phase,
-                                                                        unitId: selectedUnitMeta.unit.id,
-                                                                        sessionId: sessionData.id
-                                                                    }
-                                                                });
-                                                            } catch (e) {
-                                                                console.error('Error creating session:', e);
-                                                                // Fallback navigation without session ID if creation fails
-                                                                router.push({
-                                                                    pathname: '/(tabs)/camera',
-                                                                    params: { phase, unitId: selectedUnitMeta.unit.id }
-                                                                });
-                                                            }
-                                                        }}
-                                                        className="bg-black px-5 py-3 rounded-full"
-                                                    >
-                                                        <Text className="text-white font-semibold">
-                                                            {selectedUnitMeta.tenancy.lease_start_date < '2025-07-01'
-                                                                ? 'Start move out photos'
-                                                                : 'Start move in photos'}
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                )}
-                                            </>
-                                        )}
-                                    </View>
-                                ) : (
-                                    <FlatList
-                                        className="flex-1"
-                                        contentContainerStyle={{
-                                            paddingHorizontal: 8,
-                                            paddingTop: 8,
-                                            paddingBottom: insets.bottom + 70,
-                                        }}
-                                        data={selectedUnitGroups}
-                                        keyExtractor={(g) => g.id}
-                                        numColumns={2}
-                                        renderItem={({ item }) => {
-                                            const cover = item.images?.[0] ?? null;
-                                            const publicUrl =
-                                                cover
-                                                    ? supabase.storage
-                                                        .from('unit-images')
-                                                        .getPublicUrl(cover.path).data.publicUrl
-                                                    : null;
-                                            const badges = stageBadges(item.images);
-
-                                            return (
-                                                <View className="w-1/2 p-1">
-                                                    <TouchableOpacity className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                                                        {publicUrl ? (
-                                                            <Image
-                                                                source={{ uri: publicUrl }}
-                                                                className="w-full h-28"
-                                                                resizeMode="cover"
-                                                            />
-                                                        ) : (
-                                                            <View className="w-full h-28 bg-gray-200 justify-center items-center">
-                                                                <Ionicons
-                                                                    name="image-outline"
-                                                                    size={24}
-                                                                    color="#9ca3af"
-                                                                />
-                                                            </View>
-                                                        )}
-                                                        <View className="p-2">
-                                                            <Text
-                                                                numberOfLines={1}
-                                                                className="text-xs font-semibold text-black"
-                                                            >
-                                                                {item.name}
-                                                            </Text>
-                                                            {item.room && (
-                                                                <Text
-                                                                    numberOfLines={1}
-                                                                    className="text-[10px] text-gray-500 mt-0.5"
-                                                                >
-                                                                    {item.room.name}
-                                                                </Text>
-                                                            )}
-                                                            <View className="flex-row flex-wrap mt-1">
-                                                                {badges.map((b) => (
-                                                                    <View
-                                                                        key={b.label}
-                                                                        className="px-1.5 py-0.5 mr-1 mb-1 rounded-full border bg-gray-50 border-gray-200"
-                                                                    >
-                                                                        <Text className="text-[9px] text-gray-500">
-                                                                            {b.label}
-                                                                        </Text>
-                                                                    </View>
-                                                                ))}
-                                                            </View>
-                                                        </View>
-                                                    </TouchableOpacity>
-                                                </View>
-                                            );
-                                        }}
-                                    />
-                                )}
-                            </>
-                        ) : (
-                            <View className="flex-1 justify-center items-center px-4">
-                                <Text className="text-sm text-gray-500 text-center">
-                                    No unit selected.
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                </Animated.View>
+                <UnitSidePanel
+                    visible={unitModalVisible}
+                    onClose={() => setUnitModalVisible(false)}
+                    selectedUnitMeta={selectedUnitMeta}
+                    selectedUnitGroups={selectedUnitGroups}
+                    roomFilters={roomFilters}
+                    roomFilterId={roomFilterId}
+                    setRoomFilterId={setRoomFilterId}
+                    activeSessionsMap={activeSessionsMap}
+                />
             </SafeAreaView>
         </View>
     );
