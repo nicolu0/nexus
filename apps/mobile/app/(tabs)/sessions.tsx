@@ -8,6 +8,10 @@ import {
     RefreshControl,
     Modal,
     Image,
+    Dimensions,
+    StyleSheet,
+    Animated,
+    Easing,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +34,13 @@ type SessionRow = {
     last_activity_at: string;
     tenancies: {
         unit_id: string;
+        units: {
+            unit_number: string;
+            properties: {
+                name: string;
+                address_line1: string | null;
+            } | null;
+        } | null;
     } | null;
 };
 
@@ -45,6 +56,29 @@ export default function SessionsScreen() {
     const insets = useSafeAreaInsets();
 
     const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
+
+    const screenWidth = Dimensions.get('window').width;
+    const slideAnim = React.useRef(new Animated.Value(screenWidth)).current;
+
+    useEffect(() => {
+        if (selectedSession) {
+            // Slide in
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 150,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease),
+            }).start();
+        } else {
+            // Slide out
+            Animated.timing(slideAnim, {
+                toValue: screenWidth,
+                duration: 150,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease),
+            }).start();
+        }
+    }, [selectedSession, slideAnim, screenWidth]);
     const [sessionImages, setSessionImages] = useState<{ id: string; path: string }[]>([]);
     const [loadingImages, setLoadingImages] = useState(false);
 
@@ -104,7 +138,14 @@ export default function SessionsScreen() {
                 .select(`
                     *,
                     tenancies (
-                        unit_id
+                        unit_id,
+                        units (
+                            unit_number,
+                            properties (
+                                name,
+                                address_line1
+                            )
+                        )
                     )
                 `)
                 .eq('created_by', user.id)
@@ -233,12 +274,11 @@ export default function SessionsScreen() {
 
                 {/* Second row: basic unit / tenancy hint */}
                 <Text className="text-xs text-stone-500 mb-1">
-                    {item.tenancies?.unit_id
-                         ? `Unit ${item.tenancies.unit_id.slice(0, 8)}`
-                         : 'No unit linked'}
-                    {item.tenancy_id
-                        ? ` · Tenancy ${item.tenancy_id.slice(0, 6)}…`
-                        : ' · No tenancy linked'}
+                    {item.tenancies?.units?.properties
+                         ? `${item.tenancies.units.properties.name} · Unit ${item.tenancies.units.unit_number}`
+                         : item.tenancies?.unit_id
+                             ? `Unit ${item.tenancies.unit_id.slice(0, 8)}`
+                             : 'No unit linked'}
                 </Text>
 
                 {/* Third row: timing info */}
@@ -332,22 +372,39 @@ export default function SessionsScreen() {
                     />
                 )}
 
-                {/* Session Images Modal */}
-                <Modal
-                    visible={!!selectedSession}
-                    animationType="slide"
-                    presentationStyle="fullScreen"
-                    onRequestClose={closeSession}
+                {/* Session Images Side Panel (Replaces Modal) */}
+                <Animated.View
+                    style={[
+                        StyleSheet.absoluteFill,
+                        { 
+                            transform: [{ translateX: slideAnim }],
+                            backgroundColor: 'white',
+                            zIndex: 50, // Ensure it sits on top of other content
+                        }
+                    ]}
                 >
                     <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
                         <View className="px-4 pt-2 pb-3 border-b border-stone-200 flex-row items-center justify-between bg-white">
-                            <TouchableOpacity onPress={closeSession} className="p-2 -ml-2">
-                                <Ionicons name="close" size={24} color="#1c1917" />
-                            </TouchableOpacity>
-                            <Text className="font-semibold text-lg text-stone-900">
-                                {selectedSession ? phaseLabel(selectedSession.phase) : 'Session'}
-                            </Text>
-                            <View className="w-8" /> 
+                            <View className="flex-row items-center">
+                                <TouchableOpacity onPress={closeSession} className="mr-3">
+                                    <Ionicons name="chevron-back" size={24} color="#111827" />
+                                </TouchableOpacity>
+                                <View>
+                                    {selectedSession && (
+                                        <>
+                                            <Text className="text-lg font-semibold text-black">
+                                                {phaseLabel(selectedSession.phase)}
+                                            </Text>
+                                            <Text className="text-xs text-gray-500">
+                                                {selectedSession.tenancies?.units?.properties?.name || 'Unknown Property'}
+                                                {selectedSession.tenancies?.units?.unit_number 
+                                                    ? ` · Unit ${selectedSession.tenancies.units.unit_number}` 
+                                                    : ''}
+                                            </Text>
+                                        </>
+                                    )}
+                                </View>
+                            </View>
                         </View>
 
                         {loadingImages ? (
@@ -366,7 +423,7 @@ export default function SessionsScreen() {
                                 data={sessionImages}
                                 keyExtractor={(item) => item.id}
                                 numColumns={3}
-                                contentContainerStyle={{ padding: 2 }}
+                                contentContainerStyle={{ padding: 2, paddingBottom: insets.bottom + 70 }}
                                 renderItem={({ item }) => {
                                     const publicUrl = supabase.storage
                                         .from('unit-images')
@@ -385,7 +442,7 @@ export default function SessionsScreen() {
                             />
                         )}
                     </View>
-                </Modal>
+                </Animated.View>
             </SafeAreaView>
         </View>
     );
