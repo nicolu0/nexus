@@ -111,18 +111,17 @@
 	<section class="relative flex min-h-screen w-full items-center overflow-hidden pb-20">
 		<TopoMap />
 
-		<!-- bottom fade-out (starts near the bottom now because hero is taller) -->
 		<div
-			class="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-64
-         bg-gradient-to-b from-transparent via-stone-50/80 to-stone-50"
+			class="pointer-events-none absolute inset-x-0 bottom-0 z-5 h-64
+         bg-linear-to-b from-transparent via-stone-50/80 to-stone-50"
 			aria-hidden="true"
 		></div>
 
 		<!-- pins overlay -->
 		<div class="pointer-events-none absolute inset-0 z-10 mx-auto max-w-7xl">
 			<div class="pointer-events-auto relative h-full w-full">
-				<AlertPin top="22%" left="14%" delay={600} severity="high" message="Flood in Basement" />
-				<AlertPin top="32%" left="95%" delay={1000} severity="medium" message="Broken Toilet" />
+				<AlertPin top="22%" left="14%" delay={600} severity="high" message="Basement Flooded" />
+				<AlertPin top="32%" left="95%" delay={1000} severity="medium" message="Toilet Clogged" />
 				<AlertPin top="58%" left="85%" delay={1400} severity="low" message="Photos Uploaded" />
 			</div>
 		</div>
@@ -157,13 +156,13 @@
 			</div>
 		</div>
 		<!-- Trusted by -->
-		<div class="absolute inset-x-0 bottom-45 z-20">
+		<div class="absolute inset-x-0 bottom-35 z-20">
 			<div class="mx-auto flex w-full flex-col items-center px-4">
 				<div class="text-sm font-medium text-stone-500">
 					Trusted by forward-thinking property managers
 				</div>
 
-				<div class="mt-6 flex flex-wrap items-center justify-center gap-10 opacity-80">
+				<div class="mt-4 flex flex-wrap items-center justify-center gap-10 opacity-80">
 					<div class="flex h-8 items-center justify-center rounded-md text-4xl font-semibold">
 						0,000+ Properties
 					</div>
@@ -176,168 +175,81 @@
 	</section>
 
 	<!-- Features -->
-	<section id="features" class="w-full py-36">
-		<div class="container mx-auto max-w-7xl px-4">
-			<div class="mb-10 flex items-end justify-between gap-6">
-				<div class="flex w-full flex-col items-center">
-					<h2 class="text-3xl font-semibold tracking-tight text-stone-900 md:text-4xl">
-						Built for AB2801, not generic storage
-					</h2>
-					<p class="mt-2 max-w-3xl text-stone-600">
-						Every photo, tag, and report maps to what California now requires for move-in and
-						move-out.
-					</p>
-				</div>
-			</div>
-
-			<div class="grid gap-4 md:grid-cols-3">
-				<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-					<div class="text-md font-semibold text-stone-900">Guided Move-In / Move-Out Capture</div>
-					<p class="mt-2 text-sm text-stone-600">
-						Room checklist, section-level camera, and phase tagging (move-in, move-out before,
-						move-out after).
-					</p>
-				</div>
-
-				<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-					<div class="text-md font-semibold text-stone-900">Auto-organized Evidence</div>
-					<p class="mt-2 text-sm text-stone-600">
-						Photos are timestamped and stored by property → unit → section with before/after pairs.
-					</p>
-				</div>
-
-				<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-					<div class="text-md font-semibold text-stone-900">Damage Detection + Deductions</div>
-					<p class="mt-2 text-sm text-stone-600">
-						AI highlights deltas, you approve tags, and Nexus generates a compliant security
-						deduction report.
-					</p>
-				</div>
-			</div>
-
-			<div class="mt-4 grid gap-4 md:grid-cols-2">
-				<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-					<div class="text-sm font-semibold text-stone-900">Portfolio Dashboard</div>
-					<p class="mt-2 text-sm text-stone-600">
-						Properties list with unit-level status, fast filters, and sidepanel review.
-					</p>
-				</div>
-
-				<div class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-					<div class="text-sm font-semibold text-stone-900">Web + Mobile Sync</div>
-					<p class="mt-2 text-sm text-stone-600">
-						Capture on site, review in the office. Everything stays in sync automatically.
-					</p>
-				</div>
-			</div>
-		</div>
-	</section>
-
-	<!-- How it works -->
-	<section id="how-it-works" class="w-full bg-white py-20">
-		<div class="container mx-auto max-w-7xl px-4">
-			<div class="mb-10">
-				<h2 class="text-3xl font-semibold tracking-tight text-stone-900 md:text-4xl">
-					How it works
+	<section id="features" class="w-full px-10 py-6">
+		<div class="mx-auto flex max-w-7xl flex-row items-center gap-10 rounded-md bg-stone-100 p-4">
+			<!-- Text column -->
+			<div class="px-6 lg:w-5/12">
+				<h2 class="text-2xl font-medium tracking-tight text-stone-900">
+					Built for AB2801, not generic storage
 				</h2>
-				<p class="mt-2 max-w-2xl text-stone-600">
-					Follow a repeatable workflow. No chasing photos. No missing sections.
+				<p class="mt-2 max-w-xl text-sm text-stone-600 md:text-base">
+					Photos are automatically organized by room, unit, and property. AI ensures that all photos
+					are properly matched.
 				</p>
 			</div>
 
-			<div class="grid gap-6 md:grid-cols-3">
-				<div class="rounded-2xl border border-stone-200 p-6">
-					<div class="text-xs font-semibold tracking-wide text-stone-500 uppercase">Step 1</div>
-					<div class="mt-2 text-lg font-semibold">Capture with the mobile checklist</div>
-					<ul class="mt-3 space-y-2 text-sm text-stone-600">
-						<li>Pick a unit + tenancy.</li>
-						<li>Room/section checklist prevents gaps.</li>
-						<li>Retake, preview, and mark sections done.</li>
-					</ul>
-				</div>
-
-				<div class="rounded-2xl border border-stone-200 p-6">
-					<div class="text-xs font-semibold tracking-wide text-stone-500 uppercase">Step 2</div>
-					<div class="mt-2 text-lg font-semibold">Auto-organize and compare</div>
-					<ul class="mt-3 space-y-2 text-sm text-stone-600">
-						<li>Photos stored by unit + section + phase.</li>
-						<li>Before/after paired automatically.</li>
-						<li>Damage deltas surfaced for review.</li>
-					</ul>
-				</div>
-
-				<div class="rounded-2xl border border-stone-200 p-6">
-					<div class="text-xs font-semibold tracking-wide text-stone-500 uppercase">Step 3</div>
-					<div class="mt-2 text-lg font-semibold">Generate compliant deductions</div>
-					<ul class="mt-3 space-y-2 text-sm text-stone-600">
-						<li>Select damages + costs.</li>
-						<li>One-click AB2801 report export.</li>
-						<li>Store and share with tenants.</li>
-					</ul>
-				</div>
-			</div>
-
-			<div class="mt-10 grid gap-6 md:grid-cols-2">
-				<div class="rounded-2xl border border-stone-200 bg-stone-50 p-6">
-					<div class="text-sm font-semibold text-stone-900">Mobile App</div>
-					<p class="mt-2 text-sm text-stone-600">Designed for on-site documentation.</p>
-					<ul class="mt-3 space-y-2 text-sm text-stone-700">
-						<li>Move-in flow: unit → sections → capture → progress bar.</li>
-						<li>Move-out flow: before/after repair tagging.</li>
-						<li>Each photo includes unit, section, phase, timestamp.</li>
-					</ul>
-				</div>
-
-				<div class="rounded-2xl border border-stone-200 bg-stone-50 p-6">
-					<div class="text-sm font-semibold text-stone-900">Web Dashboard</div>
-					<p class="mt-2 text-sm text-stone-600">Built for review and reporting.</p>
-					<ul class="mt-3 space-y-2 text-sm text-stone-700">
-						<li>Property list with unit health indicators.</li>
-						<li>Unit sidepanel with section tags.</li>
-						<li>Before/after photos side-by-side.</li>
-					</ul>
+			<!-- Gray “screenshot” box -->
+			<div class="w-7/12">
+				<div class="aspect-square w-full rounded-lg border border-stone-200 bg-stone-200/80">
+					<!-- Replace this box with a real screenshot later -->
 				</div>
 			</div>
 		</div>
 	</section>
 
-	<!-- Pricing / CTA -->
-	<section id="pricing" class="w-full py-20">
-		<div class="container mx-auto max-w-7xl px-4">
-			<div class="grid items-center gap-8 md:grid-cols-2">
-				<div>
-					<h2 class="text-3xl font-semibold tracking-tight text-stone-900 md:text-4xl">
-						Start free. Upgrade when you’re ready.
-					</h2>
-					<p class="mt-2 text-stone-600">Early access pricing is simple and month-to-month.</p>
-					<ul class="mt-4 space-y-2 text-sm text-stone-700">
-						<li>Unlimited properties and units.</li>
-						<li>AB2801 report exports included.</li>
-						<li>Email support and onboarding.</li>
-					</ul>
-				</div>
-
-				<div class="rounded-3xl border border-stone-200 bg-white p-8 shadow-sm">
-					<div class="text-sm font-semibold text-stone-900">Early Access</div>
-					<div class="mt-2 flex items-baseline gap-2">
-						<div class="text-5xl font-semibold text-stone-900">$0</div>
-						<div class="text-sm text-stone-500">to start</div>
-					</div>
-					<p class="mt-3 text-sm text-stone-600">
-						Try Nexus on your next move-in or move-out. No card required.
-					</p>
-					<button
-						type="button"
-						onclick={openModal}
-						class="mt-6 w-full rounded-xl bg-stone-800 py-3 text-sm font-semibold text-stone-50 transition hover:bg-stone-900"
-					>
-						Start Free Trial
-					</button>
-					<p class="mt-3 text-center text-xs text-stone-500">
-						Upgrade later for advanced AI and team features.
-					</p>
+	<section id="features" class="w-full px-10 py-6">
+		<div class="mx-auto flex max-w-7xl flex-row items-center gap-10 rounded-md bg-stone-100 p-8">
+			<div class="w-7/12">
+				<div class="aspect-square w-full rounded-lg border border-stone-200 bg-stone-200/80">
+					<!-- Replace this box with a real screenshot later -->
 				</div>
 			</div>
+			<div class="lg:w-5/12">
+				<h2 class="text-2xl font-medium tracking-tight text-stone-900">
+					AI powered damage detection
+				</h2>
+				<p class="mt-2 max-w-xl text-sm text-stone-600 md:text-base">
+					Every photo gets analyzed. AI will automatically notify you of damages and contact a
+					vendor on your approval.
+				</p>
+			</div>
+		</div>
+	</section>
+
+	<section id="features" class="w-full px-10 py-6">
+		<div class="mx-auto flex max-w-7xl flex-row items-center gap-10 rounded-md bg-stone-100 p-8">
+			<!-- Text column -->
+			<div class="lg:w-5/12">
+				<h2 class="text-2xl font-medium tracking-tight text-stone-900">
+					Full compliance in one click
+				</h2>
+				<p class="mt-2 max-w-xl text-stone-600">
+					AB 2801 requires an itemized statement of every security-deposit deduction with proof.
+					Nexus generates that packet from your move-in, move-out, and repair photos automatically.
+				</p>
+			</div>
+
+			<!-- Gray “screenshot” box -->
+			<div class="w-7/12">
+				<div class="aspect-square w-full rounded-lg border border-stone-200 bg-stone-200/80">
+					<!-- Replace this box with a real screenshot later -->
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section id="features" class="w-full px-10 py-30">
+		<div class="mx-auto flex max-w-7xl flex-col items-center gap-6 rounded-md p-8">
+			<h2 class="text-3xl font-semibold tracking-tight text-stone-900 md:text-4xl">
+				Start your first move-in for free
+			</h2>
+			<button
+				type="button"
+				onclick={openModal}
+				class="rounded-xl bg-stone-800 px-6 py-3 text-2xl text-stone-50 transition hover:bg-stone-900"
+			>
+				Add your first unit
+			</button>
 		</div>
 	</section>
 
