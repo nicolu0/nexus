@@ -7,7 +7,11 @@ import {
     ActivityIndicator,
     FlatList,
     Image,
-    Modal,
+    // Modal, // Removed
+    Animated,
+    Dimensions,
+    StyleSheet,
+    Easing,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -141,6 +145,29 @@ export default function DashboardScreen() {
 
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    
+    const screenWidth = Dimensions.get('window').width;
+    const slideAnim = React.useRef(new Animated.Value(screenWidth)).current;
+
+    useEffect(() => {
+        if (unitModalVisible) {
+            // Slide in
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 150,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease),
+            }).start();
+        } else {
+            // Slide out
+            Animated.timing(slideAnim, {
+                toValue: screenWidth,
+                duration: 150,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease),
+            }).start();
+        }
+    }, [unitModalVisible, slideAnim, screenWidth]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -445,7 +472,7 @@ export default function DashboardScreen() {
 
     return (
         <View className="flex-1 bg-stone-50">
-            <SafeAreaView className="flex-1">
+            <SafeAreaView className="flex-1" edges={['top']}>
                 {/* HEADER */}
                 <View className="px-4 pt-2 pb-3 flex-row items-center justify-between">
                     <View>
@@ -530,7 +557,7 @@ export default function DashboardScreen() {
                 {/* UNITS LIST FOR SELECTED PROPERTY */}
                 <ScrollView
                     className="flex-1 px-4"
-                    contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+                    contentContainerStyle={{ paddingBottom: insets.bottom + 70 }}
                 >
                     {!selectedProperty && (
                         <View className="mt-10 items-center">
@@ -602,11 +629,16 @@ export default function DashboardScreen() {
                         ))}
                 </ScrollView>
 
-                {/* UNIT SIDE MODAL */}
-                <Modal
-                    visible={unitModalVisible}
-                    animationType="slide"
-                    presentationStyle="fullScreen"
+                {/* UNIT SIDE PANEL (Replaces Modal) */}
+                <Animated.View
+                    style={[
+                        StyleSheet.absoluteFill,
+                        { 
+                            transform: [{ translateX: slideAnim }],
+                            backgroundColor: 'white',
+                            zIndex: 50, // Ensure it sits on top of other dashboard content
+                        }
+                    ]}
                 >
                     <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
                         {/* Modal header */}
@@ -778,7 +810,7 @@ export default function DashboardScreen() {
                                         contentContainerStyle={{
                                             paddingHorizontal: 8,
                                             paddingTop: 8,
-                                            paddingBottom: 24,
+                                            paddingBottom: insets.bottom + 70,
                                         }}
                                         data={selectedUnitGroups}
                                         keyExtractor={(g) => g.id}
@@ -854,7 +886,7 @@ export default function DashboardScreen() {
                             </View>
                         )}
                     </View>
-                </Modal>
+                </Animated.View>
             </SafeAreaView>
         </View>
     );

@@ -282,7 +282,7 @@ export default function SessionsScreen() {
 
     return (
         <View className="flex-1 bg-stone-50">
-            <SafeAreaView className="flex-1">
+            <SafeAreaView className="flex-1" edges={['top']}>
                 {/* Header */}
                 <View className="px-4 pt-3 pb-2">
                     <Text className="text-2xl font-bold text-stone-900">
@@ -328,7 +328,7 @@ export default function SessionsScreen() {
                         refreshControl={
                             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                         }
-                        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+                        contentContainerStyle={{ paddingBottom: insets.bottom + 70 }}
                     />
                 )}
 
