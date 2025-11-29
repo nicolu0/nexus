@@ -1,11 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    ActivityIndicator,
-} from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import * as Location from 'expo-location';
@@ -14,52 +8,7 @@ import { useFocusEffect } from 'expo-router';
 import { PropertyDropdown } from '../../components/sm/PropertyDropdown';
 import { UnitSidePanel } from '../../components/lg/UnitSidePanel';
 import { UnitList } from '../../components/md/UnitList';
-
-type Tenancy = {
-    id: string;
-    tenant_name: string;
-    lease_start_date: string; // 'YYYY-MM-DD'
-    move_out_date: string | null;
-};
-
-type Unit = {
-    id: string;
-    unit_number: string;
-    tenancies: Tenancy[] | null;
-};
-
-type Property = {
-    id: string;
-    name: string;
-    address_line1: string | null;
-    city: string | null;
-    state: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    units: Unit[] | null;
-};
-
-type Room = {
-    id: string;
-    name: string;
-};
-
-type ImageRow = {
-    id: string;
-    path: string;
-    session?: { phase: string } | null;
-};
-
-type GroupRow = {
-    id: string;
-    name: string;
-    tenancy_id: string | null;
-    description: string | null;
-    room: Room | null;
-    images: ImageRow[] | null;
-};
-
-type TenancyStatus = 'Upcoming' | 'Active' | 'Vacated' | 'No tenancy';
+import { Property, GroupRow, TenancyStatus, Unit, Tenancy, Room } from '../../types';
 
 function todayDateString(): string {
     // 'YYYY-MM-DD'

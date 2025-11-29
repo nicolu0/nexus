@@ -1,40 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    ScrollView,
-    FlatList,
-    Image,
-    Animated,
-    Dimensions,
-    StyleSheet,
-    Easing,
-    ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { RoomFilter } from '../sm/RoomFilter';
-
-type SessionPhase = string;
-
-type SessionRow = {
-    id: string;
-    unit_id: string;
-    tenancy_id: string | null;
-    phase: SessionPhase;
-    tenancies: {
-        unit_id: string;
-        units: {
-            unit_number: string;
-            properties: {
-                name: string;
-                address_line1: string | null;
-            } | null;
-        } | null;
-    } | null;
-};
+import { SessionRow, SessionPhase } from '../../types';
 
 type SessionSidePanelProps = {
     selectedSession: SessionRow | null;

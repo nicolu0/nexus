@@ -1,67 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    ScrollView,
-    FlatList,
-    Image,
-    Animated,
-    Dimensions,
-    StyleSheet,
-    Easing,
-} from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { RoomFilter } from '../sm/RoomFilter';
-
-// Types duplicated from dashboard.tsx for self-containment
-// Ideally these should be in a shared types file
-type Tenancy = {
-    id: string;
-    tenant_name: string;
-    lease_start_date: string;
-    move_out_date: string | null;
-};
-
-type Unit = {
-    id: string;
-    unit_number: string;
-    tenancies: Tenancy[] | null;
-};
-
-type Property = {
-    id: string;
-    name: string;
-    address_line1: string | null;
-    city: string | null;
-    state: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    units: Unit[] | null;
-};
-
-type Room = {
-    id: string;
-    name: string;
-};
-
-type ImageRow = {
-    id: string;
-    path: string;
-    session?: { phase: string } | null;
-};
-
-type GroupRow = {
-    id: string;
-    name: string;
-    tenancy_id: string | null;
-    description: string | null;
-    room: Room | null;
-    images: ImageRow[] | null;
-};
+import { Unit, Property, Tenancy, GroupRow, Room, ImageRow } from '../../types';
 
 type UnitSidePanelProps = {
     visible: boolean;

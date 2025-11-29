@@ -1,43 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-    View,
-    Text,
-    FlatList,
-    TouchableOpacity,
-    ActivityIndicator,
-    RefreshControl,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { SessionSidePanel } from '../../components/lg/SessionSidePanel';
-
-type SessionStatus = 'in_progress' | 'completed' | 'abandoned' | string;
-type SessionPhase = string;
-
-type SessionRow = {
-    id: string;
-    unit_id: string;
-    tenancy_id: string | null;
-    phase: SessionPhase;
-    status: SessionStatus;
-    created_by: string | null;
-    started_at: string;
-    completed_at: string | null;
-    last_activity_at: string;
-    tenancies: {
-        unit_id: string;
-        units: {
-            unit_number: string;
-            properties: {
-                name: string;
-                address_line1: string | null;
-            } | null;
-        } | null;
-    } | null;
-};
+import { SessionRow, SessionStatus, SessionPhase } from '../../types';
 
 type Filter = 'all' | 'in_progress' | 'completed';
 

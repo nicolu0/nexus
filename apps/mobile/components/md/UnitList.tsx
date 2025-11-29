@@ -1,39 +1,7 @@
 import React from 'react';
-import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    RefreshControl,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { EdgeInsets } from 'react-native-safe-area-context';
-
-// Types duplicated from dashboard.tsx for self-containment
-type Tenancy = {
-    id: string;
-    tenant_name: string;
-    lease_start_date: string; // 'YYYY-MM-DD'
-    move_out_date: string | null;
-};
-
-type Unit = {
-    id: string;
-    unit_number: string;
-    tenancies: Tenancy[] | null;
-};
-
-type Property = {
-    id: string;
-    name: string;
-    address_line1: string | null;
-    city: string | null;
-    state: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    units: Unit[] | null;
-};
-
-type TenancyStatus = 'Upcoming' | 'Active' | 'Vacated' | 'No tenancy';
+import { TenancyStatus, Unit, Property, Tenancy } from '../../types';
 
 type UnitListProps = {
     selectedProperty: Property | null;
