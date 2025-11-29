@@ -9,7 +9,7 @@ import {
     Modal,
     Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -41,6 +41,8 @@ export default function SessionsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [filter, setFilter] = useState<Filter>('all');
     const [error, setError] = useState<string | null>(null);
+
+    const insets = useSafeAreaInsets();
 
     const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
     const [sessionImages, setSessionImages] = useState<{ id: string; path: string }[]>([]);
@@ -90,6 +92,13 @@ export default function SessionsScreen() {
     const loadSessions = useCallback(async () => {
         setError(null);
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                setSessions([]);
+                setLoading(false);
+                return;
+            }
+
             const { data, error } = await supabase
                 .from('sessions')
                 .select(`
@@ -98,6 +107,7 @@ export default function SessionsScreen() {
                         unit_id
                     )
                 `)
+                .eq('created_by', user.id)
                 .order('last_activity_at', { ascending: false });
 
             if (error) throw error;
@@ -329,7 +339,7 @@ export default function SessionsScreen() {
                     presentationStyle="fullScreen"
                     onRequestClose={closeSession}
                 >
-                    <SafeAreaView className="flex-1 bg-stone-50">
+                    <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
                         <View className="px-4 pt-2 pb-3 border-b border-stone-200 flex-row items-center justify-between bg-white">
                             <TouchableOpacity onPress={closeSession} className="p-2 -ml-2">
                                 <Ionicons name="close" size={24} color="#1c1917" />
@@ -374,7 +384,7 @@ export default function SessionsScreen() {
                                 }}
                             />
                         )}
-                    </SafeAreaView>
+                    </View>
                 </Modal>
             </SafeAreaView>
         </View>
