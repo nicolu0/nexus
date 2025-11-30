@@ -47,6 +47,9 @@ export function RoomSelector({
                 viewabilityConfig={{
                     itemVisiblePercentThreshold: 50
                 }}
+                onScrollBeginDrag={() => {
+                    tapTargetRef.current = null;
+                }}
                 onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
                     if (tapTargetRef.current) return;
 
@@ -80,6 +83,8 @@ export function RoomSelector({
                             onPress={() => {
                                 if (item === '+ Custom') {
                                     onCustomRoom();
+                                } else if (item === selectedRoom) {
+                                    return;
                                 } else {
                                     tapTargetRef.current = item;
                                     flatListRef.current?.scrollToOffset({ offset: index * itemWidth, animated: true });
