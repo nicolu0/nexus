@@ -5,6 +5,7 @@ import {
     TouchableOpacity,
     StyleSheet,
     Alert,
+    Dimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -227,7 +228,7 @@ export default function CameraScreen() {
         }
     }, [showCustomRoomModal]);
 
-    const ITEM_WIDTH = 110;
+    const ITEM_WIDTH = 100;
 
     useFocusEffect(
         useCallback(() => {
@@ -575,32 +576,63 @@ export default function CameraScreen() {
         }
     }
 
+    const screenWidth = Dimensions.get('window').width;
+    const screenHeight = Dimensions.get('window').height;
+    const camHeight = screenWidth * (4 / 3);
+
     return (
         <View className="flex-1 bg-black">
+            {/* Fullscreen Camera */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
-            <CameraTopControls
-                ref={topControlsRef}
-                properties={properties}
-                units={units}
-                selectedProperty={selectedProperty}
-                selectedUnit={selectedUnit}
-                onSelectProperty={setSelectedProperty}
-                onSelectUnit={setSelectedUnit}
-                onSignOut={handleSignOut}
-            />
+            {/* Overlays to create 4:3 visual mask */}
+            <View className="flex-1 w-full">
+                <View 
+                    style={{ 
+                        height: screenHeight * 0.13, 
+                        backgroundColor: 'rgba(0,0,0,0.5)' 
+                    }} 
+                />
+                <View 
+                    style={{ 
+                        width: screenWidth, 
+                        height: camHeight,
+                        backgroundColor: 'transparent' 
+                    }} 
+                />
+                <View 
+                    style={{ 
+                        flex: 1, 
+                        backgroundColor: 'rgba(0,0,0,0.5)' 
+                    }} 
+                />
+            </View>
 
-            <CameraBottomControls
-                rooms={rooms}
-                selectedRoom={selectedRoom}
-                onSelectRoom={setSelectedRoom}
-                onCustomRoom={() => setShowCustomRoomModal(true)}
-                onCapture={takePicture}
-                capturing={capturing}
-                itemWidth={ITEM_WIDTH}
-                tapTargetRef={tapTargetRef}
-                activeSessionPhase={activeSession?.phase}
-            />
+            {/* Controls Layer */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                <CameraTopControls
+                    ref={topControlsRef}
+                    properties={properties}
+                    units={units}
+                    selectedProperty={selectedProperty}
+                    selectedUnit={selectedUnit}
+                    onSelectProperty={setSelectedProperty}
+                    onSelectUnit={setSelectedUnit}
+                    onSignOut={handleSignOut}
+                />
+
+                <CameraBottomControls
+                    rooms={rooms}
+                    selectedRoom={selectedRoom}
+                    onSelectRoom={setSelectedRoom}
+                    onCustomRoom={() => setShowCustomRoomModal(true)}
+                    onCapture={takePicture}
+                    capturing={capturing}
+                    itemWidth={ITEM_WIDTH}
+                    tapTargetRef={tapTargetRef}
+                    activeSessionPhase={activeSession?.phase}
+                />
+            </View>
 
             <CustomRoomModal
                 visible={showCustomRoomModal}

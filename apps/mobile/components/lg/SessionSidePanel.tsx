@@ -1,19 +1,24 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { RoomFilter } from '../sm/RoomFilter';
 import { SessionRow, SessionPhase } from '../../types';
+import { ImageDetailModal } from '../md/ImageDetailModal';
 
 type SessionSidePanelProps = {
     selectedSession: SessionRow | null;
     onClose: () => void;
     loadingImages: boolean;
-    sessionImages: { id: string; path: string; groups: { name: string } | null }[];
+    sessionImages: { id: string; path: string; created_at: string; groups: { id: string; name: string; room_id: string } | null }[];
     sessionRoomFilter: string | null;
     setSessionRoomFilter: (filter: string | null) => void;
     phaseLabel: (phase: SessionPhase) => string;
+    unitRooms: { id: string; name: string }[];
+    onUpdateImage: (imageId: string, newRoomId: string, newRoomName: string) => Promise<void>;
+    onDeleteImage: (imageId: string) => Promise<void>;
+    onRefreshSessions?: () => void;
 };
 
 export function SessionSidePanel({
@@ -24,10 +29,15 @@ export function SessionSidePanel({
     sessionRoomFilter,
     setSessionRoomFilter,
     phaseLabel,
+    unitRooms,
+    onUpdateImage,
+    onDeleteImage,
+    onRefreshSessions,
 }: SessionSidePanelProps) {
     const insets = useSafeAreaInsets();
     const screenWidth = Dimensions.get('window').width;
     const slideAnim = useRef(new Animated.Value(screenWidth)).current;
+    const [selectedImage, setSelectedImage] = useState<{ id: string; path: string; created_at: string; groups: { id: string; name: string; room_id: string } | null } | null>(null);
 
     useEffect(() => {
         if (selectedSession) {
@@ -46,6 +56,7 @@ export function SessionSidePanel({
                 useNativeDriver: true,
                 easing: Easing.out(Easing.ease),
             }).start();
+            setSelectedImage(null);
         }
     }, [selectedSession, slideAnim, screenWidth]);
 
@@ -64,6 +75,17 @@ export function SessionSidePanel({
         if (!sessionRoomFilter) return sessionImages;
         return sessionImages.filter(img => img.groups?.name === sessionRoomFilter);
     }, [sessionImages, sessionRoomFilter]);
+
+    const formatTimestamp = (timestamp: string) => {
+        const date = new Date(timestamp);
+        return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    };
 
     return (
         <Animated.View
@@ -132,7 +154,10 @@ export function SessionSidePanel({
                                 .getPublicUrl(item.path).data.publicUrl;
 
                             return (
-                                <View className="w-1/3 aspect-square p-0.5 relative">
+                                <TouchableOpacity 
+                                    className="w-1/3 aspect-square p-0.5 relative"
+                                    onPress={() => setSelectedImage(item)}
+                                >
                                     <Image
                                         source={{ uri: publicUrl }}
                                         className="w-full h-full bg-stone-200"
@@ -145,13 +170,30 @@ export function SessionSidePanel({
                                             </Text>
                                         </View>
                                     )}
-                                </View>
+                                </TouchableOpacity>
                             );
                         }}
                     />
                 )}
             </View>
+
+            {selectedImage && (
+                <ImageDetailModal
+                    visible={!!selectedImage}
+                    imageUrl={supabase.storage.from('unit-images').getPublicUrl(selectedImage.path).data.publicUrl}
+                    roomName={selectedImage.groups?.name || 'Unknown Room'}
+                    timestamp={formatTimestamp(selectedImage.created_at)}
+                    availableRooms={unitRooms}
+                    onClose={() => setSelectedImage(null)}
+                    onSave={(newRoomId, newRoomName) => onUpdateImage(selectedImage.id, newRoomId, newRoomName)}
+                    onDelete={async () => {
+                        await onDeleteImage(selectedImage.id);
+                        onRefreshSessions?.();
+                    }}
+                />
+            )}
         </Animated.View>
     );
 }
+
 

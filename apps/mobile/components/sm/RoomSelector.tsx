@@ -22,7 +22,7 @@ export function RoomSelector({
     const flatListRef = useRef<FlatList>(null);
 
     return (
-        <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-28">
+        <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-24">
             <LinearGradient
                 colors={['rgba(0,0,0,0.8)', 'transparent']}
                 start={{ x: 0, y: 0 }}
@@ -86,16 +86,16 @@ export function RoomSelector({
                             style={{
                                 position: 'absolute',
                                 minWidth: itemWidth,
-                                height: 34,
+                                height: 28,
                             }}
-                            className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedRoom === item && item !== '+ Custom'
+                            className={`px-3 rounded-full items-center justify-center overflow-hidden ${selectedRoom === item && item !== '+ Custom'
                                 ? 'bg-stone-900/80 border border-white/30'
                                 : ''
                                 }`}
                         >
                             <Text
                                 numberOfLines={1}
-                                className={`text-base font-medium ${selectedRoom === item
+                                className={`text-sm font-medium ${selectedRoom === item
                                     ? 'text-white'
                                     : 'text-white/60'
                                     }`}

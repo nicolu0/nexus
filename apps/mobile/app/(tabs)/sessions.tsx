@@ -21,8 +21,9 @@ export default function SessionsScreen() {
 
     const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
     const [sessionRoomFilter, setSessionRoomFilter] = useState<string | null>(null);
-    const [sessionImages, setSessionImages] = useState<{ id: string; path: string; groups: { name: string } | null }[]>([]);
+    const [sessionImages, setSessionImages] = useState<{ id: string; path: string; created_at: string; groups: { id: string; name: string; room_id: string } | null }[]>([]);
     const [loadingImages, setLoadingImages] = useState(false);
+    const [unitRooms, setUnitRooms] = useState<{ id: string; name: string }[]>([]);
 
     const phaseLabel = (phase: SessionPhase) => {
         switch (phase) {
@@ -119,11 +120,15 @@ export default function SessionsScreen() {
                 .select(`
                     id, 
                     path,
+                    created_at,
                     groups (
-                        name
+                        id,
+                        name,
+                        room_id
                     )
                 `)
-                .eq('session_id', sessionId);
+                .eq('session_id', sessionId)
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
 
@@ -136,16 +141,37 @@ export default function SessionsScreen() {
         }
     };
 
+    const fetchUnitRooms = async (unitId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('rooms')
+                .select('id, name')
+                .eq('unit_id', unitId)
+                .order('name');
+            
+            if (error) throw error;
+            setUnitRooms(data || []);
+        } catch (e) {
+            console.error('Error fetching unit rooms:', e);
+        }
+    };
+
     const openSession = (session: SessionRow) => {
         setSelectedSession(session);
         setSessionRoomFilter(null);
         fetchSessionImages(session.id);
+        if (session.tenancies?.unit_id) {
+            fetchUnitRooms(session.tenancies.unit_id);
+        } else if (session.unit_id) {
+             fetchUnitRooms(session.unit_id);
+        }
     };
 
     const closeSession = () => {
         setSelectedSession(null);
         setSessionImages([]);
         setSessionRoomFilter(null);
+        setUnitRooms([]);
     };
 
     const onRefresh = useCallback(async () => {
@@ -153,6 +179,90 @@ export default function SessionsScreen() {
         await loadSessions();
         setRefreshing(false);
     }, [loadSessions]);
+
+    const handleUpdateImage = async (imageId: string, newRoomId: string, newRoomName: string) => {
+        try {
+            // Update the group associated with the image
+            // Since we are doing 1-to-1 group per image logic currently, we can update the group.
+            // However, better to just create a new group or check if one exists?
+            // Simpler: Update the image's group.
+            
+            // First find the image to get its group_id
+            const image = sessionImages.find(img => img.id === imageId);
+            if (!image || !image.groups) return;
+
+            const groupId = image.groups.id;
+
+            // Update the group
+            const { error } = await supabase
+                .from('groups')
+                .update({ 
+                    name: newRoomName,
+                    room_id: newRoomId 
+                })
+                .eq('id', groupId);
+
+            if (error) throw error;
+
+            // Update local state
+            setSessionImages(prev => prev.map(img => {
+                if (img.id === imageId) {
+                    return {
+                        ...img,
+                        groups: {
+                            ...img.groups!,
+                            name: newRoomName,
+                            room_id: newRoomId
+                        }
+                    };
+                }
+                return img;
+            }));
+
+        } catch (e) {
+            console.error('Error updating image:', e);
+            alert('Failed to update image tag');
+        }
+    };
+
+    const handleDeleteImage = async (imageId: string) => {
+        try {
+            // If move-in session, identifying the group to delete
+            let groupIdToDelete: string | undefined;
+            if (selectedSession?.phase === 'move_in') {
+                const image = sessionImages.find(img => img.id === imageId);
+                if (image?.groups?.id) {
+                    groupIdToDelete = image.groups.id;
+                }
+            }
+
+            // Delete the image
+            const { error } = await supabase
+                .from('images')
+                .delete()
+                .eq('id', imageId);
+
+            if (error) throw error;
+
+            // If move-in session, also delete the group
+            if (groupIdToDelete) {
+                const { error: groupError } = await supabase
+                    .from('groups')
+                    .delete()
+                    .eq('id', groupIdToDelete);
+                
+                if (groupError) {
+                    console.error('Error deleting group:', groupError);
+                }
+            }
+
+            // Update local state
+            setSessionImages(prev => prev.filter(img => img.id !== imageId));
+        } catch (e) {
+            console.error('Error deleting image:', e);
+            alert('Failed to delete image');
+        }
+    };
 
     const filteredSessions = sessions.filter((s) => {
         if (filter === 'all') return true;
@@ -332,6 +442,10 @@ export default function SessionsScreen() {
                     sessionRoomFilter={sessionRoomFilter}
                     setSessionRoomFilter={setSessionRoomFilter}
                     phaseLabel={phaseLabel}
+                    unitRooms={unitRooms}
+                    onUpdateImage={handleUpdateImage}
+                    onDeleteImage={handleDeleteImage}
+                    onRefreshSessions={loadSessions}
                 />
             </SafeAreaView>
         </View>

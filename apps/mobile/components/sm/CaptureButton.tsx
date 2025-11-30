@@ -12,7 +12,7 @@ export function CaptureButton({ onPress, disabled, activeSessionPhase }: Capture
     const isIOS = Platform.OS === 'ios';
 
     return (
-        <View className="absolute bottom-0 left-0 right-0 mb-44 items-center z-20" pointerEvents="box-none">
+        <View className="absolute bottom-0 left-0 right-0 mb-36 items-center z-20" pointerEvents="box-none">
             <View className="relative flex-row items-center">
                 {/* Phase Tag - Positioned to the left of the button */}
                 {activeSessionPhase && (
