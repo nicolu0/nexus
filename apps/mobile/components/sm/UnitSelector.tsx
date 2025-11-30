@@ -55,7 +55,7 @@ export function UnitSelector({
                         <Text className="text-white font-medium mr-1 max-w-[80px]" numberOfLines={1}>
                             {selectedUnit?.unit_number || 'Unit'}
                         </Text>
-                        <Ionicons name="chevron-down" size={16} color="white" />
+                        <Ionicons name={isOpen ? "chevron-up" : "chevron-down"} size={16} color="white" />
                     </View>
                 </GlassView>
             </TouchableOpacity>
