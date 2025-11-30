@@ -76,17 +76,6 @@ export function SessionSidePanel({
         return sessionImages.filter(img => img.groups?.name === sessionRoomFilter);
     }, [sessionImages, sessionRoomFilter]);
 
-    const formatTimestamp = (timestamp: string) => {
-        const date = new Date(timestamp);
-        return date.toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        });
-    };
-
     return (
         <Animated.View
             style={[
@@ -182,7 +171,7 @@ export function SessionSidePanel({
                     visible={!!selectedImage}
                     imageUrl={supabase.storage.from('unit-images').getPublicUrl(selectedImage.path).data.publicUrl}
                     roomName={selectedImage.groups?.name || 'Unknown Room'}
-                    timestamp={formatTimestamp(selectedImage.created_at)}
+                    timestamp={selectedImage.created_at}
                     availableRooms={unitRooms}
                     onClose={() => setSelectedImage(null)}
                     onSave={(newRoomId, newRoomName) => onUpdateImage(selectedImage.id, newRoomId, newRoomName)}

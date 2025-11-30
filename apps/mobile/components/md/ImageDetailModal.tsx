@@ -29,6 +29,31 @@ export function ImageDetailModal({
     const [currentRoom, setCurrentRoom] = useState(roomName);
     const [showDropdown, setShowDropdown] = useState(false);
     const [saving, setSaving] = useState(false);
+    // Helper to format the date
+    const formatDateTime = (iso: string) => {
+        if (!iso) return '';
+        
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return iso;
+
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const year = String(date.getFullYear()).slice(-2);
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+
+        return `${month}/${day}/${year} ${hours}:${minutes}`;
+    };
+
+    const displayTimestamp = React.useMemo(() => {
+        const d = new Date(timestamp);
+        if (!Number.isNaN(d.getTime()) && timestamp.includes('T')) {
+             return formatDateTime(timestamp);
+        }
+
+        return timestamp;
+    }, [timestamp]);
+
     const [deleting, setDeleting] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const insets = useSafeAreaInsets();
@@ -174,7 +199,7 @@ export function ImageDetailModal({
                                 {/* Bottom Right Timestamp */}
                                 <View className="absolute bottom-4 right-4 bg-black/60 px-2 py-1 rounded border border-white/10 backdrop-blur-md">
                                     <Text className="text-white/90 text-sm font-mono">
-                                        {timestamp}
+                                        {displayTimestamp}
                                     </Text>
                                 </View>
                             </View>

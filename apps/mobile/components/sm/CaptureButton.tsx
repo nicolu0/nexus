@@ -13,7 +13,7 @@ export function CaptureButton({ onPress, disabled, activeSessionPhase }: Capture
     const liquidAvailable = isIOS && isLiquidGlassAvailable();
 
     return (
-        <View className="absolute bottom-0 left-0 right-0 mb-36 items-center z-20" pointerEvents="box-none">
+        <View className={`absolute bottom-0 left-0 right-0 items-center z-20 ${liquidAvailable ? 'mb-36' : 'mb-14'}`} pointerEvents="box-none">
             <View className="relative flex-row items-center">
                 {activeSessionPhase && (
                     <View className="absolute right-[100px] bg-black/60 px-3 py-1.5 rounded-full border border-white/20">

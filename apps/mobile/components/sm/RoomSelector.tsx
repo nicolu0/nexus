@@ -25,7 +25,7 @@ export function RoomSelector({
     const liquidAvailable = isIOS && isLiquidGlassAvailable();
 
     return (
-        <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-24">
+        <View className={`absolute bottom-0 left-0 right-0 h-12 z-20 ${liquidAvailable ? 'mb-24' : 'mb-1'}`}>
             <LinearGradient
                 colors={['rgba(0,0,0,0.8)', 'transparent']}
                 start={{ x: 0, y: 0 }}
