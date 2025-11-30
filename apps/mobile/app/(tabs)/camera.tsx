@@ -506,7 +506,11 @@ export default function CameraScreen() {
             return;
         }
 
-        // Haptic feedback
+        if (!activeSession) {
+            showToast('Start a session in dashboard to take photos!', 'error');
+            return;
+        }
+
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         setCapturing(true);

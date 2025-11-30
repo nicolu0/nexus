@@ -54,6 +54,8 @@ export function ToastNotification({ message, type, onDismiss }: ToastNotificatio
             friction: 7,
         }).start();
 
+        const duration = type === 'error' ? 5000 : 2000;
+
         const timer = setTimeout(() => {
             Animated.timing(slideAnim, {
                 toValue: -100,
@@ -62,7 +64,7 @@ export function ToastNotification({ message, type, onDismiss }: ToastNotificatio
             }).start(() => {
                 dismissRef.current();
             });
-        }, 2000);
+        }, duration);
 
         return () => clearTimeout(timer);
     }, []);
