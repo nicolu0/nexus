@@ -2,9 +2,10 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
-    Button,
+    TouchableOpacity,
     StyleSheet,
     Alert,
+    Dimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -66,7 +67,7 @@ export default function CameraScreen() {
     const [units, setUnits] = useState<{ id: string; unit_number: string }[]>([]);
     const [selectedProperty, setSelectedProperty] = useState<{ id: string; name: string; latitude?: number; longitude?: number } | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<{ id: string; unit_number: string } | null>(null);
-    const { photos, addPhoto } = usePhotos();
+    const { addPhoto } = usePhotos();
 
     const [rooms, setRooms] = useState<string[]>([]);
     const [selectedRoom, setSelectedRoom] = useState<string>('');
@@ -92,10 +93,71 @@ export default function CameraScreen() {
     // Also check if sessionId param is passed directly (optional override)
     useEffect(() => {
         if (params.sessionId) {
-            // If explicitly passed, we can rely on it or fetch details
-            // But fetchActiveSession covers the unit-based check
+            fetchSessionAndSetContext(params.sessionId);
         }
-    }, [params]);
+    }, [params.sessionId]);
+
+    async function fetchSessionAndSetContext(sessionId: string) {
+        try {
+            const { data: session, error } = await supabase
+                .from('sessions')
+                .select(`
+                    id,
+                    phase,
+                    tenancy_id,
+                    tenancies (
+                        unit_id,
+                        units (
+                            id,
+                            unit_number,
+                            property_id,
+                            properties (
+                                id,
+                                name,
+                                latitude,
+                                longitude
+                            )
+                        )
+                    )
+                `)
+                .eq('id', sessionId)
+                .single();
+
+            if (error || !session) return;
+
+            // @ts-ignore - complex nested join type
+            const unitData = session.tenancies?.units;
+            // @ts-ignore
+            const propertyData = unitData?.properties;
+
+            if (unitData && propertyData) {
+                // Set property first
+                setSelectedProperty({
+                    id: propertyData.id,
+                    name: propertyData.name,
+                    latitude: propertyData.latitude,
+                    longitude: propertyData.longitude
+                });
+
+                // Then unit (need to make sure units are fetched or we set it manually)
+                // Since we have the ID and number, we can set it directly
+                setSelectedUnit({
+                    id: unitData.id,
+                    unit_number: unitData.unit_number
+                });
+
+                // Active session state will be updated by the useEffect listening to selectedUnit
+                // but we can also set it here to be snappy
+                setActiveSession({
+                    id: session.id,
+                    phase: session.phase as 'move_in' | 'move_out',
+                    tenancy_id: session.tenancy_id!
+                });
+            }
+        } catch (e) {
+            console.error('Error fetching session context:', e);
+        }
+    }
 
     async function fetchActiveSession(unitId: string) {
         try {
@@ -115,10 +177,28 @@ export default function CameraScreen() {
             // Find in-progress session
             const { data: session } = await supabase
                 .from('sessions')
-                .select('id, phase, tenancy_id')
+                .select(`
+                    id, 
+                    phase, 
+                    tenancy_id,
+                    tenancies (
+                        unit_id,
+                        units (
+                            id,
+                            unit_number,
+                            property_id,
+                            properties (
+                                id,
+                                name,
+                                latitude,
+                                longitude
+                            )
+                        )
+                    )
+                `)
                 .in('tenancy_id', tenancyIds)
                 .eq('status', 'in_progress')
-                .maybeSingle(); // Use maybeSingle to avoid error if none or multiple (take first)
+                .maybeSingle();
 
             if (session) {
                 setActiveSession({
@@ -126,6 +206,13 @@ export default function CameraScreen() {
                     phase: session.phase as 'move_in' | 'move_out',
                     tenancy_id: session.tenancy_id!
                 });
+
+                // If explicitly passed via navigation or simply on load, we might want to sync state
+                // But if the user manually navigated to camera and we found a session, we should probably select it
+                // However, the `unitId` argument comes from `selectedUnit`, so we're already looking at that unit.
+                // The only case to handle is setting property/unit if `fetchActiveSession` was called with an ID 
+                // that ISN'T currently selected (e.g. from params).
+                
             } else {
                 setActiveSession(null);
             }
@@ -312,7 +399,7 @@ export default function CameraScreen() {
         }
     }
 
-    async function getPhotoContext(unitId: string) {
+    async function getTenancyId(unitId: string) {
         try {
             const now = new Date();
             const { data: tenancies, error } = await supabase
@@ -324,73 +411,34 @@ export default function CameraScreen() {
             if (error) throw error;
 
             if (!tenancies || tenancies.length === 0) {
-                return { tenancyId: null, phase: 'move_in' };
+                return null;
             }
 
-            // Find relevant tenancy
-            // 1. Check for active tenancy (start <= now <= end/move_out)
-            // 2. Check for upcoming tenancy (start > now)
-            // 3. Check for recently ended tenancy (move_out < now)
-
+            // 1. Active tenancy
             const activeTenancy = tenancies.find(t => {
                 const start = new Date(t.lease_start_date);
                 const end = t.move_out_date ? new Date(t.move_out_date) : new Date('9999-12-31');
                 return now >= start && now <= end;
             });
+            if (activeTenancy) return activeTenancy.id;
 
-            if (activeTenancy) {
-                // If active session exists for this unit (which maps to a tenancy), prefer it
-                if (activeSession && activeSession.tenancy_id === activeTenancy.id) {
-                    return { tenancyId: activeSession.tenancy_id, phase: activeSession.phase };
-                }
-
-                // Determine phase based on dates
-                const start = new Date(activeTenancy.lease_start_date);
-                const end = activeTenancy.move_out_date ? new Date(activeTenancy.move_out_date) : null;
-
-                // If within 14 days of start -> Move In
-                const daysSinceStart = (now.getTime() - start.getTime()) / (1000 * 3600 * 24);
-                if (daysSinceStart <= 14) return { tenancyId: activeTenancy.id, phase: 'move_in' };
-
-                // If within 14 days of end -> Move Out
-                if (end) {
-                    const daysUntilEnd = (end.getTime() - now.getTime()) / (1000 * 3600 * 24);
-                    if (daysUntilEnd <= 14) return { tenancyId: activeTenancy.id, phase: 'move_out' };
-                }
-
-                // Default to repair/inspection during tenancy
-                return { tenancyId: activeTenancy.id, phase: 'repair' };
-            }
-
-            // If no active tenancy, check upcoming
+            // 2. Upcoming tenancy
             const upcomingTenancy = tenancies.find(t => new Date(t.lease_start_date) > now);
-            if (upcomingTenancy) {
-                if (activeSession && activeSession.tenancy_id === upcomingTenancy.id) {
-                    return { tenancyId: upcomingTenancy.id, phase: activeSession.phase };
-                }
-                return { tenancyId: upcomingTenancy.id, phase: 'move_in' };
-            }
+            if (upcomingTenancy) return upcomingTenancy.id;
 
-            // If no upcoming, check most recent past
+            // 3. Recent past tenancy (within 14 days)
             const pastTenancy = tenancies[tenancies.length - 1];
             if (pastTenancy) {
-                // If recently ended (within 14 days) -> Move Out
-                // If active session exists for this tenancy, use it
-                if (activeSession && activeSession.tenancy_id === pastTenancy.id) {
-                     return { tenancyId: pastTenancy.id, phase: activeSession.phase };
-                }
-
-                const end = pastTenancy.move_out_date ? new Date(pastTenancy.move_out_date) : new Date(pastTenancy.lease_start_date); // Fallback
+                const end = pastTenancy.move_out_date ? new Date(pastTenancy.move_out_date) : new Date(pastTenancy.lease_start_date);
                 const daysSinceEnd = (now.getTime() - end.getTime()) / (1000 * 3600 * 24);
-                if (daysSinceEnd <= 14) return { tenancyId: pastTenancy.id, phase: 'move_out' };
+                if (daysSinceEnd <= 14) return pastTenancy.id;
             }
 
-            // Fallback
-            return { tenancyId: null, phase: 'move_in' };
+            return null;
 
         } catch (e) {
             console.error('Error determining context:', e);
-            return { tenancyId: null, phase: 'move_in' };
+            return null;
         }
     }
 
@@ -438,7 +486,9 @@ export default function CameraScreen() {
                 <Text className="text-center pb-2.5 text-white">
                     We need your permission to show the camera
                 </Text>
-                <Button onPress={requestPermission} title="Grant permission" />
+                <TouchableOpacity onPress={requestPermission} className="bg-blue-500 py-3 rounded-lg">
+                    <Text className="text-white text-center font-semibold">Grant permission</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -477,7 +527,7 @@ export default function CameraScreen() {
                 );
                 console.log('Uploaded to Supabase:', storagePath, publicUrl);
 
-                const { tenancyId, phase } = await getPhotoContext(selectedUnit.id);
+                const tenancyId = await getTenancyId(selectedUnit.id);
                 const roomId = roomIdMap[selectedRoom];
 
                 // 1. Create Group
@@ -487,7 +537,6 @@ export default function CameraScreen() {
                         name: selectedRoom,
                         room_id: roomId,
                         tenancy_id: tenancyId,
-                        session_id: activeSession?.id
                     })
                     .select('id')
                     .single();
@@ -500,8 +549,8 @@ export default function CameraScreen() {
                     .insert({
                         path: storagePath,
                         group_id: group.id,
-                        phase: phase,
                         mime_type: 'image/jpeg',
+                        session_id: activeSession?.id
                     });
 
                 if (dbError) {
@@ -527,32 +576,63 @@ export default function CameraScreen() {
         }
     }
 
+    const screenWidth = Dimensions.get('window').width;
+    const screenHeight = Dimensions.get('window').height;
+    const camHeight = screenWidth * (4 / 3);
+
     return (
         <View className="flex-1 bg-black">
+            {/* Fullscreen Camera */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
-            <CameraTopControls
-                ref={topControlsRef}
-                properties={properties}
-                units={units}
-                selectedProperty={selectedProperty}
-                selectedUnit={selectedUnit}
-                onSelectProperty={setSelectedProperty}
-                onSelectUnit={setSelectedUnit}
-                onSignOut={handleSignOut}
-            />
+            {/* Overlays to create 4:3 visual mask */}
+            <View className="flex-1 w-full">
+                <View 
+                    style={{ 
+                        height: screenHeight * 0.13, 
+                        backgroundColor: 'rgba(0,0,0,0.5)' 
+                    }} 
+                />
+                <View 
+                    style={{ 
+                        width: screenWidth, 
+                        height: camHeight,
+                        backgroundColor: 'transparent' 
+                    }} 
+                />
+                <View 
+                    style={{ 
+                        flex: 1, 
+                        backgroundColor: 'rgba(0,0,0,0.5)' 
+                    }} 
+                />
+            </View>
 
-            <CameraBottomControls
-                rooms={rooms}
-                selectedRoom={selectedRoom}
-                onSelectRoom={setSelectedRoom}
-                onCustomRoom={() => setShowCustomRoomModal(true)}
-                onCapture={takePicture}
-                capturing={capturing}
-                itemWidth={ITEM_WIDTH}
-                tapTargetRef={tapTargetRef}
-                activeSessionPhase={activeSession?.phase}
-            />
+            {/* Controls Layer */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                <CameraTopControls
+                    ref={topControlsRef}
+                    properties={properties}
+                    units={units}
+                    selectedProperty={selectedProperty}
+                    selectedUnit={selectedUnit}
+                    onSelectProperty={setSelectedProperty}
+                    onSelectUnit={setSelectedUnit}
+                    onSignOut={handleSignOut}
+                />
+
+                <CameraBottomControls
+                    rooms={rooms}
+                    selectedRoom={selectedRoom}
+                    onSelectRoom={setSelectedRoom}
+                    onCustomRoom={() => setShowCustomRoomModal(true)}
+                    onCapture={takePicture}
+                    capturing={capturing}
+                    itemWidth={ITEM_WIDTH}
+                    tapTargetRef={tapTargetRef}
+                    activeSessionPhase={activeSession?.phase}
+                />
+            </View>
 
             <CustomRoomModal
                 visible={showCustomRoomModal}
@@ -562,7 +642,6 @@ export default function CameraScreen() {
                 onSubmit={handleAddCustomRoom}
             />
 
-            {/* Toast Notification */}
             {toast && (
                 <ToastNotification
                     message={toast.message}

@@ -1,0 +1,238 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../../lib/supabase';
+import { RoomFilter } from '../sm/RoomFilter';
+import { SessionRow, SessionPhase } from '../../types';
+import { ImageDetailModal } from '../md/ImageDetailModal';
+
+type SessionSidePanelProps = {
+    selectedSession: SessionRow | null;
+    onClose: () => void;
+    loadingImages: boolean;
+    sessionImages: { id: string; path: string; created_at: string; groups: { id: string; name: string; room_id: string } | null }[];
+    sessionRoomFilter: string | null;
+    setSessionRoomFilter: (filter: string | null) => void;
+    phaseLabel: (phase: SessionPhase) => string;
+    unitRooms: { id: string; name: string }[];
+    onUpdateImage: (imageId: string, newRoomId: string, newRoomName: string) => Promise<void>;
+    onDeleteImage: (imageId: string) => Promise<void>;
+    onRefreshSessions?: () => void;
+    onEndSession?: () => Promise<void>;
+    onStartMoveOut?: () => Promise<void>;
+};
+
+export function SessionSidePanel({
+    selectedSession,
+    onClose,
+    loadingImages,
+    sessionImages,
+    sessionRoomFilter,
+    setSessionRoomFilter,
+    phaseLabel,
+    unitRooms,
+    onUpdateImage,
+    onDeleteImage,
+    onRefreshSessions,
+    onEndSession,
+    onStartMoveOut,
+}: SessionSidePanelProps) {
+    const insets = useSafeAreaInsets();
+    const screenWidth = Dimensions.get('window').width;
+    const slideAnim = useRef(new Animated.Value(screenWidth)).current;
+    const [selectedImage, setSelectedImage] = useState<{ id: string; path: string; created_at: string; groups: { id: string; name: string; room_id: string } | null } | null>(null);
+
+    useEffect(() => {
+        if (selectedSession) {
+            // Slide in
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 150,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease),
+            }).start();
+        } else {
+            // Slide out
+            Animated.timing(slideAnim, {
+                toValue: screenWidth,
+                duration: 150,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease),
+            }).start();
+            setSelectedImage(null);
+        }
+    }, [selectedSession, slideAnim, screenWidth]);
+
+    // Session Room Filter Logic
+    const sessionRoomFilters = React.useMemo(() => {
+        const rooms = new Set<string>();
+        sessionImages.forEach(img => {
+            if (img.groups?.name) {
+                rooms.add(img.groups.name);
+            }
+        });
+        return Array.from(rooms).sort();
+    }, [sessionImages]);
+
+    const filteredSessionImages = React.useMemo(() => {
+        if (!sessionRoomFilter) return sessionImages;
+        return sessionImages.filter(img => img.groups?.name === sessionRoomFilter);
+    }, [sessionImages, sessionRoomFilter]);
+
+    const handleEndSession = () => {
+        Alert.alert(
+            "End Session",
+            "Are you sure you want to end this session? This will mark it as completed.",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "End Session",
+                    style: "destructive",
+                    onPress: async () => {
+                        if (onEndSession) {
+                            await onEndSession();
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    return (
+        <Animated.View
+            style={[
+                StyleSheet.absoluteFill,
+                {
+                    transform: [{ translateX: slideAnim }],
+                    backgroundColor: 'white',
+                    zIndex: 50, // Ensure it sits on top of other content
+                }
+            ]}
+        >
+            <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
+                <View className="px-4 pt-2 pb-3 border-b border-stone-200 flex-row items-center justify-between bg-white">
+                    <View className="flex-row items-center flex-1">
+                        <TouchableOpacity onPress={onClose} className="mr-3">
+                            <Ionicons name="chevron-back" size={24} color="#111827" />
+                        </TouchableOpacity>
+                        <View className="flex-1">
+                            {selectedSession && (
+                                <>
+                                    <Text className="text-lg font-semibold text-black">
+                                        {phaseLabel(selectedSession.phase)}
+                                        {' · '}
+                                        <Text className={`text-lg ${
+                                            selectedSession.status === 'completed' ? 'text-emerald-600/80' :
+                                            selectedSession.status === 'in_progress' ? 'text-amber-600/80' :
+                                            'text-gray-500'
+                                        }`}>
+                                            {selectedSession.status === 'in_progress' ? 'In-progress' :
+                                             selectedSession.status === 'completed' ? 'Completed' :
+                                             selectedSession.status.replace('_', ' ').replace(/^\w/, c => c.toUpperCase())}
+                                        </Text>
+                                    </Text>
+                                    <Text className="text-xs text-gray-500">
+                                        {selectedSession.tenancies?.units?.properties?.name || 'Unknown Property'}
+                                        {selectedSession.tenancies?.units?.unit_number
+                                            ? ` · Unit ${selectedSession.tenancies.units.unit_number}`
+                                            : ''}
+                                    </Text>
+                                </>
+                            )}
+                        </View>
+                    </View>
+                    
+                    {selectedSession?.status === 'in_progress' && onEndSession ? (
+                        <TouchableOpacity 
+                            onPress={handleEndSession}
+                            className="bg-red-500 px-4 py-2 rounded-full"
+                        >
+                            <Text className="text-white text-sm font-semibold">End Session</Text>
+                        </TouchableOpacity>
+                    ) : selectedSession?.status === 'completed' && selectedSession?.phase === 'move_in' && onStartMoveOut ? (
+                        <TouchableOpacity 
+                            onPress={onStartMoveOut}
+                            className="bg-black px-4 py-2 rounded-full"
+                        >
+                            <Text className="text-white text-sm font-semibold">Start Move-out</Text>
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
+
+                {/* Room Filters */}
+                {sessionRoomFilters.length > 0 && (
+                    <RoomFilter
+                        rooms={sessionRoomFilters}
+                        selectedRoomId={sessionRoomFilter}
+                        onSelectRoom={setSessionRoomFilter}
+                    />
+                )}
+
+                {loadingImages ? (
+                    <View className="flex-1 justify-center items-center">
+                        <ActivityIndicator size="large" />
+                    </View>
+                ) : sessionImages.length === 0 ? (
+                    <View className="flex-1 justify-center items-center px-8">
+                        <Ionicons name="images-outline" size={48} color="#d6d3d1" />
+                        <Text className="mt-4 text-stone-500 text-center">
+                            No photos in this session yet.
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredSessionImages}
+                        keyExtractor={(item) => item.id}
+                        numColumns={3}
+                        contentContainerStyle={{ padding: 2, paddingBottom: insets.bottom + 70 }}
+                        renderItem={({ item }) => {
+                            const publicUrl = supabase.storage
+                                .from('unit-images')
+                                .getPublicUrl(item.path).data.publicUrl;
+
+                            return (
+                                <TouchableOpacity 
+                                    className="w-1/3 aspect-square p-0.5 relative"
+                                    onPress={() => setSelectedImage(item)}
+                                >
+                                    <Image
+                                        source={{ uri: publicUrl }}
+                                        className="w-full h-full bg-stone-200"
+                                        resizeMode="cover"
+                                    />
+                                    {item.groups?.name && (
+                                        <View className="absolute top-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded">
+                                            <Text className="text-[9px] text-white font-medium">
+                                                {item.groups.name}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        }}
+                    />
+                )}
+            </View>
+
+            {selectedImage && (
+                <ImageDetailModal
+                    visible={!!selectedImage}
+                    imageUrl={supabase.storage.from('unit-images').getPublicUrl(selectedImage.path).data.publicUrl}
+                    roomName={selectedImage.groups?.name || 'Unknown Room'}
+                    timestamp={selectedImage.created_at}
+                    availableRooms={unitRooms}
+                    onClose={() => setSelectedImage(null)}
+                    onSave={(newRoomId, newRoomName) => onUpdateImage(selectedImage.id, newRoomId, newRoomName)}
+                    onDelete={async () => {
+                        await onDeleteImage(selectedImage.id);
+                        onRefreshSessions?.();
+                    }}
+                />
+            )}
+        </Animated.View>
+    );
+}

@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Dimensions, NativeSyntheticEvent, NativeScrollEvent, Platform, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 
 interface RoomSelectorProps {
     rooms: string[];
@@ -20,9 +21,11 @@ export function RoomSelector({
     tapTargetRef,
 }: RoomSelectorProps) {
     const flatListRef = useRef<FlatList>(null);
+    const isIOS = Platform.OS === 'ios';
+    const liquidAvailable = isIOS && isLiquidGlassAvailable();
 
     return (
-        <View className="absolute bottom-0 left-0 right-0 h-12 z-20 mb-28">
+        <View className={`absolute bottom-0 left-0 right-0 h-12 z-20 ${liquidAvailable ? 'mb-24' : 'mb-1'}`}>
             <LinearGradient
                 colors={['rgba(0,0,0,0.8)', 'transparent']}
                 start={{ x: 0, y: 0 }}
@@ -69,42 +72,71 @@ export function RoomSelector({
                         }
                     }
                 }}
-                renderItem={({ item, index }: { item: string, index: number }) => (
-                    <TouchableOpacity
-                        onPress={() => {
-                            if (item === '+ Custom') {
-                                onCustomRoom();
-                            } else {
-                                tapTargetRef.current = item;
-                                flatListRef.current?.scrollToOffset({ offset: index * itemWidth, animated: true });
-                            }
-                        }}
-                        style={{ width: itemWidth, zIndex: selectedRoom === item ? 50 : 1 }}
-                        className="justify-center items-center h-full"
-                    >
-                        <View
-                            style={{
-                                position: 'absolute',
-                                minWidth: itemWidth,
-                                height: 34,
+                renderItem={({ item, index }: { item: string, index: number }) => {
+                    const isSelected = selectedRoom === item && item !== '+ Custom';
+                    
+                    return (
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (item === '+ Custom') {
+                                    onCustomRoom();
+                                } else {
+                                    tapTargetRef.current = item;
+                                    flatListRef.current?.scrollToOffset({ offset: index * itemWidth, animated: true });
+                                }
                             }}
-                            className={`px-4 rounded-full items-center justify-center overflow-hidden ${selectedRoom === item && item !== '+ Custom'
-                                ? 'bg-stone-900/80 border border-white/30'
-                                : ''
-                                }`}
+                            style={{ width: itemWidth, zIndex: selectedRoom === item ? 50 : 1 }}
+                            className="justify-center items-center h-full"
                         >
-                            <Text
-                                numberOfLines={1}
-                                className={`text-base font-medium ${selectedRoom === item
-                                    ? 'text-white'
-                                    : 'text-white/60'
-                                    }`}
-                            >
-                                {item}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-                )}
+                            {isSelected && liquidAvailable ? (
+                                <GlassView
+                                    glassEffectStyle="regular"
+                                    isInteractive={false}
+                                    tintColor="rgba(20, 20, 20, 0.6)"
+                                    style={[
+                                        {
+                                            position: 'absolute',
+                                            width: itemWidth - 8,
+                                            height: 28,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        },
+                                        styles.glassPill
+                                    ]}
+                                >
+                                    <Text
+                                        numberOfLines={1}
+                                        className="text-xs font-medium text-white px-3 text-center w-full"
+                                    >
+                                        {item}
+                                    </Text>
+                                </GlassView>
+                            ) : (
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        width: itemWidth - 8,
+                                        height: 28,
+                                    }}
+                                    className={`px-3 rounded-full items-center justify-center overflow-hidden ${isSelected
+                                        ? 'bg-stone-900/80 border border-white/30'
+                                        : ''
+                                        }`}
+                                >
+                                    <Text
+                                        numberOfLines={1}
+                                        className={`text-xs font-medium text-center w-full ${selectedRoom === item
+                                            ? 'text-white'
+                                            : 'text-white/60'
+                                            }`}
+                                    >
+                                        {item}
+                                    </Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    );
+                }}
             />
             <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -116,3 +148,10 @@ export function RoomSelector({
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    glassPill: {
+        borderRadius: 9999,
+        overflow: 'hidden',
+    },
+});
