@@ -146,21 +146,14 @@ export function SessionSidePanel({
                         </View>
                     </View>
                     
-                    {selectedSession?.status === 'in_progress' && onEndSession ? (
+                    {selectedSession?.status === 'in_progress' && onEndSession && (
                         <TouchableOpacity 
                             onPress={handleEndSession}
                             className="bg-red-500 px-4 py-2 rounded-full"
                         >
                             <Text className="text-white text-sm font-semibold">End Session</Text>
                         </TouchableOpacity>
-                    ) : selectedSession?.status === 'completed' && selectedSession?.phase === 'move_in' && onStartMoveOut ? (
-                        <TouchableOpacity 
-                            onPress={onStartMoveOut}
-                            className="bg-black px-4 py-2 rounded-full"
-                        >
-                            <Text className="text-white text-sm font-semibold">Start Move-out</Text>
-                        </TouchableOpacity>
-                    ) : null}
+                    )}
                 </View>
 
                 {/* Room Filters */}

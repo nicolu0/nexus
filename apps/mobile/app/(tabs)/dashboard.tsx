@@ -74,6 +74,7 @@ export default function DashboardScreen() {
     const [properties, setProperties] = useState<Property[]>([]);
     const [groups, setGroups] = useState<GroupRow[]>([]);
     const [activeSessionsMap, setActiveSessionsMap] = useState<Record<string, string>>({});
+    const [completedMoveInMap, setCompletedMoveInMap] = useState<Record<string, boolean>>({});
     const [tenancyMoveOutMap, setTenancyMoveOutMap] = useState<
         Record<string, boolean>
     >({});
@@ -247,6 +248,21 @@ export default function DashboardScreen() {
                 }
             });
             setActiveSessionsMap(sessionsMap);
+
+            // 6) Fetch COMPLETED move-in sessions for these tenancies
+            // This is needed to show "Start Move-out" button if no active session exists
+            const { data: completedMoveIns } = await supabase
+                .from('sessions')
+                .select('tenancy_id')
+                .in('tenancy_id', tenancyIds)
+                .eq('phase', 'move_in')
+                .eq('status', 'completed');
+            
+            const completedMap: Record<string, boolean> = {};
+            (completedMoveIns || []).forEach(s => {
+                if (s.tenancy_id) completedMap[s.tenancy_id] = true;
+            });
+            setCompletedMoveInMap(completedMap);
 
         } catch (err) {
             console.error('Error loading dashboard:', err);
@@ -426,6 +442,7 @@ export default function DashboardScreen() {
                     roomFilterId={roomFilterId}
                     setRoomFilterId={setRoomFilterId}
                     activeSessionsMap={activeSessionsMap}
+                    completedMoveInMap={completedMoveInMap}
                 />
             </SafeAreaView>
         </View>

@@ -20,6 +20,7 @@ type UnitSidePanelProps = {
     roomFilterId: string | null;
     setRoomFilterId: (id: string | null) => void;
     activeSessionsMap: Record<string, string>;
+    completedMoveInMap: Record<string, boolean>;
 };
 
 export function UnitSidePanel({
@@ -31,11 +32,52 @@ export function UnitSidePanel({
     roomFilterId,
     setRoomFilterId,
     activeSessionsMap,
+    completedMoveInMap,
 }: UnitSidePanelProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const screenWidth = Dimensions.get('window').width;
     const slideAnim = useRef(new Animated.Value(screenWidth)).current;
+
+    // Logic to determine if "Start Move-out" button should be shown in header
+    const showStartMoveOut = selectedUnitMeta?.tenancy?.id 
+        && !activeSessionsMap[selectedUnitMeta.tenancy.id] 
+        && completedMoveInMap[selectedUnitMeta.tenancy.id];
+
+    const handleStartMoveOut = async () => {
+        if (!selectedUnitMeta?.tenancy) return;
+        onClose();
+        try {
+            const { data: sessionData, error: sessionError } = await supabase
+                .from('sessions')
+                .insert({
+                    tenancy_id: selectedUnitMeta.tenancy.id,
+                    phase: 'move_out',
+                    status: 'in_progress',
+                    created_by: (await supabase.auth.getUser()).data.user?.id
+                })
+                .select('id')
+                .single();
+
+            if (sessionError) throw sessionError;
+
+            router.push({
+                pathname: '/(tabs)/camera',
+                params: {
+                    phase: 'move_out',
+                    unitId: selectedUnitMeta.unit.id,
+                    sessionId: sessionData.id
+                }
+            });
+        } catch (e) {
+            console.error('Error creating move-out session:', e);
+            // Fallback
+            router.push({
+                pathname: '/(tabs)/camera',
+                params: { phase: 'move_out', unitId: selectedUnitMeta.unit.id }
+            });
+        }
+    };
 
     useEffect(() => {
         if (visible) {
@@ -83,7 +125,7 @@ export function UnitSidePanel({
             <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
                 {/* Modal header */}
                 <View className="px-4 pt-2 pb-3 border-b border-gray-200 flex-row items-center justify-between">
-                    <View className="flex-row items-center">
+                    <View className="flex-row items-center flex-1">
                         <TouchableOpacity
                             onPress={() => {
                                 onClose();
@@ -111,6 +153,16 @@ export function UnitSidePanel({
                             )}
                         </View>
                     </View>
+
+                    {/* Right side: Start Move-out Button */}
+                    {showStartMoveOut && (
+                        <TouchableOpacity
+                            onPress={handleStartMoveOut}
+                            className="bg-black px-4 py-3 rounded-full"
+                        >
+                            <Text className="text-white text-md font-semibold">Start Move-out</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* Room filter + groups */}
