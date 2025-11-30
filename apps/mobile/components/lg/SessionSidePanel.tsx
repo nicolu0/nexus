@@ -224,6 +224,7 @@ export function SessionSidePanel({
                         await onDeleteImage(selectedImage.id);
                         onRefreshSessions?.();
                     }}
+                    isCompleted={selectedSession?.status === 'completed'}
                 />
             )}
         </Animated.View>

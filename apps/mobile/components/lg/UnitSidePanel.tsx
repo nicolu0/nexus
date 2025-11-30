@@ -158,9 +158,9 @@ export function UnitSidePanel({
                     {showStartMoveOut && (
                         <TouchableOpacity
                             onPress={handleStartMoveOut}
-                            className="bg-black px-4 py-3 rounded-full"
+                            className="bg-black px-3.5 py-2.5 rounded-full"
                         >
-                            <Text className="text-white text-md font-semibold">Start Move-out</Text>
+                            <Text className="text-white text-sm font-semibold">Start Move-out</Text>
                         </TouchableOpacity>
                     )}
                 </View>
