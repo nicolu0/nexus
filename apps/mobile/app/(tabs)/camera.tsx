@@ -228,7 +228,7 @@ export default function CameraScreen() {
         }
     }, [showCustomRoomModal]);
 
-    const ITEM_WIDTH = 100;
+    const ITEM_WIDTH = 110;
 
     useFocusEffect(
         useCallback(() => {
