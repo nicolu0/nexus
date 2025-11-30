@@ -225,7 +225,7 @@
 				</h2>
 				<p class="mt-2 max-w-xl text-stone-600">
 					AB 2801 requires an itemized statement of every security-deposit deduction with proof.
-					Nexus generates that packet from your move-in, move-out, and repair photos automatically.
+					Nexus generates one and sends it to the tenant automatically.
 				</p>
 			</div>
 

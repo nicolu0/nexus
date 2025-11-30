@@ -209,7 +209,7 @@ export function updateUnitStatus(propertyIndex: number, unitIndex: number, statu
 export async function fetchUnitImages(unitId: string): Promise<UnitImageRecord[]> {
 	const { data, error } = await supabase
 		.from('images')
-		.select('id, section_name, phase, bucket, path, mime_type, sort_order, created_at')
+		.select('id, section_name, phase, bucket, path, mime_type, sort_order, created_at, damaged')
 		.eq('unit_id', unitId)
 		.order('section_name', { ascending: true })
 		.order('sort_order', { ascending: true })
@@ -230,6 +230,7 @@ export async function fetchUnitImages(unitId: string): Promise<UnitImageRecord[]
 			mime_type: row.mime_type,
 			sort_order: row.sort_order,
 			created_at: row.created_at,
+			damaged: row.damaged,
 			url: publicUrl
 		};
 	});
