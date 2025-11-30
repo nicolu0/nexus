@@ -61,6 +61,7 @@ export type SessionRow = {
     completed_at: string | null;
     last_activity_at: string;
     tenancies: {
+        id: string;
         unit_id: string;
         units: {
             unit_number: string;

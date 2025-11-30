@@ -176,14 +176,14 @@ export function ImageDetailModal({
                                     {showDropdown && (
                                         <View className="absolute top-full left-0 mt-2 w-48 bg-black/80 rounded-lg shadow-xl overflow-hidden max-h-60 z-30 backdrop-blur-md border border-white/10">
                                             <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={true}>
-                                                {availableRooms.map(room => (
+                                                {availableRooms.map((room, index) => (
                                                     <TouchableOpacity 
                                                         key={room.id}
                                                         onPress={() => {
                                                             setCurrentRoom(room.name);
                                                             setShowDropdown(false);
                                                         }}
-                                                        className={`px-4 py-3 border-b border-white/10 active:bg-white/10 flex-row justify-between items-center ${currentRoom === room.name ? 'bg-white/20' : ''}`}
+                                                        className={`px-4 py-3 border-white/10 active:bg-white/10 flex-row justify-between items-center ${currentRoom === room.name ? 'bg-white/20' : ''} ${index === availableRooms.length - 1 ? '' : 'border-b'}`}
                                                     >
                                                         <Text className={`text-sm ${currentRoom === room.name ? 'font-bold text-white' : 'text-white/80'}`}>
                                                             {room.name}

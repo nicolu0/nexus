@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -19,6 +19,8 @@ type SessionSidePanelProps = {
     onUpdateImage: (imageId: string, newRoomId: string, newRoomName: string) => Promise<void>;
     onDeleteImage: (imageId: string) => Promise<void>;
     onRefreshSessions?: () => void;
+    onEndSession?: () => Promise<void>;
+    onStartMoveOut?: () => Promise<void>;
 };
 
 export function SessionSidePanel({
@@ -33,6 +35,8 @@ export function SessionSidePanel({
     onUpdateImage,
     onDeleteImage,
     onRefreshSessions,
+    onEndSession,
+    onStartMoveOut,
 }: SessionSidePanelProps) {
     const insets = useSafeAreaInsets();
     const screenWidth = Dimensions.get('window').width;
@@ -76,6 +80,28 @@ export function SessionSidePanel({
         return sessionImages.filter(img => img.groups?.name === sessionRoomFilter);
     }, [sessionImages, sessionRoomFilter]);
 
+    const handleEndSession = () => {
+        Alert.alert(
+            "End Session",
+            "Are you sure you want to end this session? This will mark it as completed.",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "End Session",
+                    style: "destructive",
+                    onPress: async () => {
+                        if (onEndSession) {
+                            await onEndSession();
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <Animated.View
             style={[
@@ -89,15 +115,25 @@ export function SessionSidePanel({
         >
             <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
                 <View className="px-4 pt-2 pb-3 border-b border-stone-200 flex-row items-center justify-between bg-white">
-                    <View className="flex-row items-center">
+                    <View className="flex-row items-center flex-1">
                         <TouchableOpacity onPress={onClose} className="mr-3">
                             <Ionicons name="chevron-back" size={24} color="#111827" />
                         </TouchableOpacity>
-                        <View>
+                        <View className="flex-1">
                             {selectedSession && (
                                 <>
                                     <Text className="text-lg font-semibold text-black">
                                         {phaseLabel(selectedSession.phase)}
+                                        {' · '}
+                                        <Text className={`text-lg ${
+                                            selectedSession.status === 'completed' ? 'text-emerald-600/80' :
+                                            selectedSession.status === 'in_progress' ? 'text-amber-600/80' :
+                                            'text-gray-500'
+                                        }`}>
+                                            {selectedSession.status === 'in_progress' ? 'In-progress' :
+                                             selectedSession.status === 'completed' ? 'Completed' :
+                                             selectedSession.status.replace('_', ' ').replace(/^\w/, c => c.toUpperCase())}
+                                        </Text>
                                     </Text>
                                     <Text className="text-xs text-gray-500">
                                         {selectedSession.tenancies?.units?.properties?.name || 'Unknown Property'}
@@ -109,6 +145,22 @@ export function SessionSidePanel({
                             )}
                         </View>
                     </View>
+                    
+                    {selectedSession?.status === 'in_progress' && onEndSession ? (
+                        <TouchableOpacity 
+                            onPress={handleEndSession}
+                            className="bg-red-500 px-4 py-2 rounded-full"
+                        >
+                            <Text className="text-white text-sm font-semibold">End Session</Text>
+                        </TouchableOpacity>
+                    ) : selectedSession?.status === 'completed' && selectedSession?.phase === 'move_in' && onStartMoveOut ? (
+                        <TouchableOpacity 
+                            onPress={onStartMoveOut}
+                            className="bg-black px-4 py-2 rounded-full"
+                        >
+                            <Text className="text-white text-sm font-semibold">Start Move-out</Text>
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
 
                 {/* Room Filters */}
@@ -184,5 +236,3 @@ export function SessionSidePanel({
         </Animated.View>
     );
 }
-
-

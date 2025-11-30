@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { SessionSidePanel } from '../../components/lg/SessionSidePanel';
@@ -18,6 +18,7 @@ export default function SessionsScreen() {
     const [error, setError] = useState<string | null>(null);
 
     const insets = useSafeAreaInsets();
+    const router = useRouter();
 
     const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
     const [sessionRoomFilter, setSessionRoomFilter] = useState<string | null>(null);
@@ -81,6 +82,7 @@ export default function SessionsScreen() {
                 .select(`
                     *,
                     tenancies (
+                        id,
                         unit_id,
                         units (
                             unit_number,
@@ -261,6 +263,71 @@ export default function SessionsScreen() {
         } catch (e) {
             console.error('Error deleting image:', e);
             alert('Failed to delete image');
+        }
+    };
+
+    const handleEndSession = async () => {
+        if (!selectedSession) return;
+
+        try {
+            const { error } = await supabase
+                .from('sessions')
+                .update({ 
+                    status: 'completed',
+                    completed_at: new Date().toISOString(),
+                    last_activity_at: new Date().toISOString() 
+                })
+                .eq('id', selectedSession.id);
+
+            if (error) throw error;
+
+            // Close the panel and refresh list
+            closeSession();
+            await loadSessions();
+        } catch (e) {
+            console.error('Error ending session:', e);
+            alert('Failed to end session');
+        }
+    };
+
+    const handleStartMoveOut = async () => {
+        if (!selectedSession) return;
+
+        try {
+            // Check if there's already an in-progress session for this unit (regardless of phase for now, or specifically move-out?)
+            // User requirement: "If an in-progress session exists for that unit, make sure not to display the button." 
+            // But here we are starting a NEW session.
+            
+            // Create new session
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('sessions')
+                .insert({
+                    tenancy_id: selectedSession.tenancies?.id, // Assuming tenancy is still valid?
+                    phase: 'move_out',
+                    status: 'in_progress',
+                    created_by: user.id
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                // Close current session panel
+                closeSession();
+                // Navigate to camera with new session ID
+                router.push({
+                    pathname: '/camera',
+                    params: { sessionId: data.id }
+                });
+            }
+
+        } catch (e) {
+            console.error('Error starting move-out session:', e);
+            alert('Failed to start move-out session');
         }
     };
 
@@ -446,6 +513,8 @@ export default function SessionsScreen() {
                     onUpdateImage={handleUpdateImage}
                     onDeleteImage={handleDeleteImage}
                     onRefreshSessions={loadSessions}
+                    onEndSession={handleEndSession}
+                    onStartMoveOut={handleStartMoveOut}
                 />
             </SafeAreaView>
         </View>
