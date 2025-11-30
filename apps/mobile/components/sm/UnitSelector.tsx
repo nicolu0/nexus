@@ -40,7 +40,7 @@ export function UnitSelector({
                 onPress={handleToggle}
                 disabled={disabled}
                 activeOpacity={0.8}
-                className={`rounded-full overflow-hidden ${disabled ? 'opacity-50' : ''}`}
+                className={`rounded-full ${disabled ? 'opacity-50' : ''}`}
             >
                 <GlassView
                     glassEffectStyle="regular"

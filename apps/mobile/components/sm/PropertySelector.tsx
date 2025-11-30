@@ -31,7 +31,7 @@ export function PropertySelector({
             <TouchableOpacity
                 onPress={onToggle}
                 activeOpacity={0.8}
-                className="rounded-full overflow-hidden"
+                className="rounded-full"
             >
                 <GlassView
                     glassEffectStyle="regular"

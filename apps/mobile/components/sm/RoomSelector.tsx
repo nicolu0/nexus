@@ -91,7 +91,7 @@ export function RoomSelector({
                             {isSelected && liquidAvailable ? (
                                 <GlassView
                                     glassEffectStyle="regular"
-                                    isInteractive={false}
+                                    isInteractive
                                     tintColor="rgba(20, 20, 20, 0.6)"
                                     style={[
                                         {
@@ -152,6 +152,5 @@ export function RoomSelector({
 const styles = StyleSheet.create({
     glassPill: {
         borderRadius: 9999,
-        overflow: 'hidden',
     },
 });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 
 interface ProfileMenuProps {
     onSignOut: () => void;
@@ -9,13 +10,29 @@ interface ProfileMenuProps {
 }
 
 export function ProfileMenu({ onSignOut, isOpen, onToggle }: ProfileMenuProps) {
+    const isIOS = Platform.OS === 'ios';
+    const liquidAvailable = isIOS && isLiquidGlassAvailable();
+
     return (
         <View className="absolute right-4 top-2 z-20">
             <TouchableOpacity
                 onPress={onToggle}
-                className="w-10 h-10 bg-black/60 rounded-full justify-center items-center backdrop-blur-md border border-white/20"
+                activeOpacity={0.8}
+                className="w-8 h-8 justify-center items-center"
             >
-                <Ionicons name="person-circle-outline" size={28} color="white" />
+                <GlassView
+                    glassEffectStyle="regular"
+                    isInteractive
+                    tintColor="rgba(20, 20, 20, 0.6)"
+                    style={[
+                        styles.glassButton,
+                        !liquidAvailable && styles.glassFallback,
+                    ]}
+                >
+                    <View className="flex-1 justify-center items-center">
+                        <Ionicons name="person" size={16} color="white" />
+                    </View>
+                </GlassView>
             </TouchableOpacity>
 
             {isOpen && (
@@ -35,3 +52,18 @@ export function ProfileMenu({ onSignOut, isOpen, onToggle }: ProfileMenuProps) {
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    glassButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    glassFallback: {
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+});

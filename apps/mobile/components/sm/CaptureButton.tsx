@@ -28,7 +28,7 @@ export function CaptureButton({ onPress, disabled, activeSessionPhase }: Capture
                     onPress={onPress}
                     activeOpacity={0.7}
                     className={isIOS && isLiquidGlassAvailable()
-                        ? "w-[80px] h-[80px] rounded-full overflow-hidden"
+                        ? "w-[80px] h-[80px] rounded-full"
                         : "w-[80px] h-[80px] rounded-full justify-center items-center"
                     }
                 >
