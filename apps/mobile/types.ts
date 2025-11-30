@@ -30,7 +30,10 @@ export type Room = {
 export type ImageRow = {
     id: string;
     path: string;
-    session?: { phase: string } | null;
+    session?: { 
+        phase: string;
+        status: string;
+    } | null;
 };
 
 export type GroupRow = {

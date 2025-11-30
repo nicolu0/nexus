@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Platform, Text } from 'react-native';
-import { GlassView } from 'expo-glass-effect';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 
 interface CaptureButtonProps {
     onPress: () => void;
@@ -27,15 +27,19 @@ export function CaptureButton({ onPress, disabled, activeSessionPhase }: Capture
                     disabled={disabled}
                     onPress={onPress}
                     activeOpacity={0.7}
-                    className={isIOS
+                    className={isIOS && isLiquidGlassAvailable()
                         ? "w-[80px] h-[80px] rounded-full overflow-hidden"
                         : "w-[80px] h-[80px] rounded-full justify-center items-center"
                     }
                 >
-                    {isIOS ? (
-                        <GlassView style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)' }}>
+                    {isIOS && isLiquidGlassAvailable() ? (
+                        <GlassView style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)' }}> 
                             <View className="w-[67px] h-[67px] rounded-full bg-white/90 shadow-sm" />
                         </GlassView>
+
+                        // <View className="w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10">
+                        //     <View className="w-[67px] h-[67px] rounded-full bg-white" />
+                        // </View>
                     ) : (
                         <View className="w-[80px] h-[80px] rounded-full bg-white/30 justify-center items-center border-2 border-white/10">
                             <View className="w-[67px] h-[67px] rounded-full bg-white" />

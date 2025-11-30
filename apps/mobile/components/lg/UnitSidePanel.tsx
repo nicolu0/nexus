@@ -222,9 +222,17 @@ export function UnitSidePanel({
                                             : null;
                                     const badges = stageBadges(item.images);
 
+                                    // Determine if ANY image in this group belongs to an in-progress session
+                                    const isInProgress = item.images?.some(img => img.session?.status === 'in_progress');
+
                                     return (
                                         <View className="w-1/2 p-1">
-                                            <TouchableOpacity className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                                            <TouchableOpacity 
+                                                className={`bg-white rounded-xl overflow-hidden ${isInProgress 
+                                                    ? 'border border-dashed border-stone-300' 
+                                                    : 'border border-gray-200'
+                                                }`}
+                                            >
                                                 {publicUrl ? (
                                                     <Image
                                                         source={{ uri: publicUrl }}

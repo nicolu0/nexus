@@ -209,7 +209,8 @@ export default function DashboardScreen() {
                     id,
                     path,
                     session:sessions (
-                        phase
+                        phase,
+                        status
                     )
                     )
                 `)
