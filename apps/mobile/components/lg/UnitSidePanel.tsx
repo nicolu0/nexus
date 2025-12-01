@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Animated, Dimensions, StyleSheet, Easing } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -288,8 +289,9 @@ export function UnitSidePanel({
                                                 {publicUrl ? (
                                                     <Image
                                                         source={{ uri: publicUrl }}
-                                                        className="w-full h-28"
-                                                        resizeMode="cover"
+                                                        style={{ width: '100%', height: 112, backgroundColor: '#e7e5e4' }}
+                                                        contentFit="cover"
+                                                        transition={200}
                                                     />
                                                 ) : (
                                                     <View className="w-full h-28 bg-gray-200 justify-center items-center">

@@ -183,29 +183,46 @@ export default function DashboardScreen() {
                 return;
             }
 
-            // 3) Fetch groups + images + room
-            const { data: groupData, error: groupsError } = await supabase
-                .from('groups')
-                .select(`
-                    id,
-                    name,
-                    tenancy_id,
-                    description,
-                    room:rooms (
-                    id,
-                    name
-                    ),
-                    images (
-                    id,
-                    path,
-                    session:sessions (
-                        phase,
-                        status
-                    )
-                    )
-                `)
-                .in('tenancy_id', tenancyIds);
+            // Parallel fetch for remaining data
+            const [groupsResult, sessionsResult, completedResult] = await Promise.all([
+                supabase
+                    .from('groups')
+                    .select(`
+                        id,
+                        name,
+                        tenancy_id,
+                        description,
+                        room:rooms (
+                        id,
+                        name
+                        ),
+                        images (
+                        id,
+                        path,
+                        session:sessions (
+                            phase,
+                            status
+                        )
+                        )
+                    `)
+                    .in('tenancy_id', tenancyIds),
+                
+                supabase
+                    .from('sessions')
+                    .select('id, tenancy_id')
+                    .in('tenancy_id', tenancyIds)
+                    .eq('status', 'in_progress'),
 
+                supabase
+                    .from('sessions')
+                    .select('tenancy_id')
+                    .in('tenancy_id', tenancyIds)
+                    .eq('phase', 'move_in')
+                    .eq('status', 'completed')
+            ]);
+
+            // 3) Process Groups
+            const { data: groupData, error: groupsError } = groupsResult;
             if (groupsError) throw groupsError;
 
             const castGroups = (groupData ?? []) as any as GroupRow[];
@@ -223,13 +240,8 @@ export default function DashboardScreen() {
             setTenancyMoveOutMap(moveOutMap);
 
 
-            // 5) Fetch active sessions for these tenancies
-            const { data: sessionsData } = await supabase
-                .from('sessions')
-                .select('id, tenancy_id')
-                .in('tenancy_id', tenancyIds)
-                .eq('status', 'in_progress');
-
+            // 5) Process Active Sessions
+            const { data: sessionsData } = sessionsResult;
             const sessionsMap: Record<string, string> = {};
             (sessionsData || []).forEach((s) => {
                 if (s.tenancy_id) {
@@ -238,15 +250,8 @@ export default function DashboardScreen() {
             });
             setActiveSessionsMap(sessionsMap);
 
-            // 6) Fetch COMPLETED move-in sessions for these tenancies
-            // This is needed to show "Start Move-out" button if no active session exists
-            const { data: completedMoveIns } = await supabase
-                .from('sessions')
-                .select('tenancy_id')
-                .in('tenancy_id', tenancyIds)
-                .eq('phase', 'move_in')
-                .eq('status', 'completed');
-            
+            // 6) Process Completed Move-ins
+            const { data: completedMoveIns } = completedResult;
             const completedMap: Record<string, boolean> = {};
             (completedMoveIns || []).forEach(s => {
                 if (s.tenancy_id) completedMap[s.tenancy_id] = true;
@@ -276,10 +281,6 @@ export default function DashboardScreen() {
         await loadDashboard();
         setRefreshing(false);
     }, []);
-
-    useEffect(() => {
-        loadDashboard();
-    }, [unitModalVisible]);
 
     useEffect(() => {
         loadDashboard();

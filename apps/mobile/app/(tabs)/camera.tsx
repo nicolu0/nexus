@@ -22,8 +22,6 @@ import { ToastNotification } from '../../components/sm/ToastNotification';
 import * as Location from 'expo-location';
 import { setStatusBarStyle } from 'expo-status-bar';
 
-let hasAutoSelected = false;
-
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
     const filename = `${Date.now()}.${ext}`;
@@ -61,6 +59,7 @@ async function uploadPhotoToSupabase(uri: string) {
 }
 
 export default function CameraScreen() {
+    const hasAutoSelectedRef = useRef(false);
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
     const topControlsRef = useRef<CameraTopControlsHandle>(null);
@@ -257,12 +256,12 @@ export default function CameraScreen() {
                 setProperties(data);
 
                 if (params.sessionId) {
-                    hasAutoSelected = true;
+                    hasAutoSelectedRef.current = true;
                     return; 
                 }
 
-                if (!hasAutoSelected) {
-                    hasAutoSelected = true;
+                if (!hasAutoSelectedRef.current) {
+                    hasAutoSelectedRef.current = true;
                     
                     let bestProperty = data.length > 0 ? data[0] : null;
 

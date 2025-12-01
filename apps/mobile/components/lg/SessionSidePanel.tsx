@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -194,8 +195,9 @@ export function SessionSidePanel({
                                 >
                                     <Image
                                         source={{ uri: publicUrl }}
-                                        className="w-full h-full bg-stone-200"
-                                        resizeMode="cover"
+                                        style={{ width: '100%', height: '100%', backgroundColor: '#e7e5e4' }}
+                                        contentFit="cover"
+                                        transition={200}
                                     />
                                     {item.groups?.name && (
                                         <View className="absolute top-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded">
