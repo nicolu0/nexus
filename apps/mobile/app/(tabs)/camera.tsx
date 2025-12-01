@@ -77,6 +77,7 @@ export default function CameraScreen() {
     const [showCustomRoomModal, setShowCustomRoomModal] = useState(false);
     const [customRoomText, setCustomRoomText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
+    const pendingUnitIdRef = useRef<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const params = useLocalSearchParams<{ phase?: string; unitId?: string; sessionId?: string }>();
     const [topControlsHeight, setTopControlsHeight] = useState(0);
@@ -129,11 +130,17 @@ export default function CameraScreen() {
             if (error || !session) return;
 
             // @ts-ignore - complex nested join type
-            const unitData = session.tenancies?.units;
+            let unitData = session.tenancies?.units;
+            if (Array.isArray(unitData)) unitData = unitData[0];
+
             // @ts-ignore
-            const propertyData = unitData?.properties;
+            let propertyData = unitData?.properties;
+            if (Array.isArray(propertyData)) propertyData = propertyData[0];
 
             if (unitData && propertyData) {
+                // Set pending unit ID to prevent fetchUnits from clearing it
+                pendingUnitIdRef.current = unitData.id;
+
                 // Set property first
                 setSelectedProperty({
                     id: propertyData.id,
@@ -162,7 +169,7 @@ export default function CameraScreen() {
         }
     }
 
-    async function fetchActiveSession(unitId: string) {
+    const fetchActiveSession = useCallback(async (unitId: string) => {
         try {
             // Find active tenancy for unit
             const { data: tenancies } = await supabase
@@ -223,7 +230,7 @@ export default function CameraScreen() {
             console.error('Error fetching active session:', err);
             setActiveSession(null);
         }
-    }
+    }, []);
 
     useEffect(() => {
         if (showCustomRoomModal) {
@@ -233,46 +240,7 @@ export default function CameraScreen() {
 
     const ITEM_WIDTH = 110;
 
-    useFocusEffect(
-        useCallback(() => {
-            setStatusBarStyle('light');
-            fetchProperties();
-            // Re-check active session when screen is focused (e.g. after deleting a session)
-            if (selectedUnit) {
-                fetchActiveSession(selectedUnit.id);
-            }
-        }, [selectedUnit]) // Add selectedUnit as dependency to re-run if it changes or on focus
-    );
-
-    React.useEffect(() => {
-        if (selectedProperty) {
-            fetchUnits(selectedProperty.id);
-        } else {
-            setUnits([]);
-            setSelectedUnit(null);
-        }
-    }, [selectedProperty]);
-
-    React.useEffect(() => {
-        if (selectedUnit) {
-            fetchUnitRooms(selectedUnit.id);
-        } else {
-            setRooms([]);
-            setSelectedRoom('');
-        }
-    }, [selectedUnit]);
-
-    React.useEffect(() => {
-        if (selectedRoom) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-    }, [selectedRoom]);
-
-    const showToast = (message: string, type: 'success' | 'error') => {
-        setToast({ message, type });
-    };
-
-    async function fetchProperties() {
+    const fetchProperties = useCallback(async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -333,7 +301,46 @@ export default function CameraScreen() {
         } catch (e) {
             console.error('Error fetching properties:', e);
         }
-    }
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            setStatusBarStyle('light');
+            fetchProperties();
+            // Re-check active session when screen is focused (e.g. after deleting a session)
+            if (selectedUnit) {
+                fetchActiveSession(selectedUnit.id);
+            }
+        }, [selectedUnit, fetchProperties, fetchActiveSession]) // Add selectedUnit as dependency to re-run if it changes or on focus
+    );
+
+    React.useEffect(() => {
+        if (selectedProperty) {
+            fetchUnits(selectedProperty.id);
+        } else {
+            setUnits([]);
+            setSelectedUnit(null);
+        }
+    }, [selectedProperty]);
+
+    React.useEffect(() => {
+        if (selectedUnit) {
+            fetchUnitRooms(selectedUnit.id);
+        } else {
+            setRooms([]);
+            setSelectedRoom('');
+        }
+    }, [selectedUnit]);
+
+    React.useEffect(() => {
+        if (selectedRoom) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+    }, [selectedRoom]);
+
+    const showToast = (message: string, type: 'success' | 'error') => {
+        setToast({ message, type });
+    };
 
     function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
         var R = 6371; // Radius of the earth in km
@@ -365,7 +372,16 @@ export default function CameraScreen() {
 
             if (data) {
                 setUnits(data);
-                setSelectedUnit(null);
+                
+                const pendingId = pendingUnitIdRef.current;
+                const foundUnit = pendingId ? data.find(u => u.id === pendingId) : null;
+                
+                if (foundUnit) {
+                    setSelectedUnit(foundUnit);
+                    pendingUnitIdRef.current = null;
+                } else {
+                    setSelectedUnit(null);
+                }
             }
         } catch (e) {
             console.error('Error fetching units:', e);
@@ -451,6 +467,8 @@ export default function CameraScreen() {
         const normalizedNewRoom = customRoomText.trim().toLowerCase();
         if (rooms.some(r => r.toLowerCase() === normalizedNewRoom)) {
             showToast('Room already exists!', 'error');
+            setCustomRoomText('');
+            setShowCustomRoomModal(false);
             return;
         }
 

@@ -113,6 +113,11 @@ export default function SessionsScreen() {
         }, [loadSessions])
     );
 
+    // Refresh sessions when a session panel is opened or closed
+    useEffect(() => {
+        loadSessions();
+    }, [selectedSession, loadSessions]);
+
     const fetchSessionImages = async (sessionId: string) => {
         setLoadingImages(true);
         try {

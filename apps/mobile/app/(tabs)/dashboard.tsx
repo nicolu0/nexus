@@ -90,18 +90,7 @@ export default function DashboardScreen() {
 
     const insets = useSafeAreaInsets();
     
-    useFocusEffect(
-        React.useCallback(() => {
-            setStatusBarStyle('dark');
-            loadDashboard();
-
-            return () => {
-                setShowPropertyMenu(false);
-            };
-        }, [])
-    );
-
-    const loadDashboard = async () => {
+    const loadDashboard = React.useCallback(async () => {
         try {
             // Don't set loading to true here if we want background refresh
             // or manage a separate refreshing state if using pull-to-refresh
@@ -269,13 +258,28 @@ export default function DashboardScreen() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [selectedPropertyId]); // Add selectedPropertyId to deps since it's used in auto-select logic (though hasAutoSelected guards it)
+
+    useFocusEffect(
+        React.useCallback(() => {
+            setStatusBarStyle('dark');
+            loadDashboard();
+
+            return () => {
+                setShowPropertyMenu(false);
+            };
+        }, [loadDashboard])
+    );
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
         await loadDashboard();
         setRefreshing(false);
     }, []);
+
+    useEffect(() => {
+        loadDashboard();
+    }, [unitModalVisible]);
 
     useEffect(() => {
         loadDashboard();
