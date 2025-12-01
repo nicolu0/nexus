@@ -256,16 +256,22 @@ export default function CameraScreen() {
             if (data) {
                 setProperties(data);
 
-                // Try to find closest property
+                if (params.sessionId) {
+                    hasAutoSelected = true;
+                    return; 
+                }
+
                 if (!hasAutoSelected) {
                     hasAutoSelected = true;
+                    
+                    let bestProperty = data.length > 0 ? data[0] : null;
+
                     try {
                         const { status } = await Location.requestForegroundPermissionsAsync();
                         if (status === 'granted') {
                             const location = await Location.getCurrentPositionAsync({});
                             const { latitude, longitude } = location.coords;
 
-                            let closestProperty = null;
                             let minDistance = Infinity;
 
                             data.forEach(property => {
@@ -278,30 +284,24 @@ export default function CameraScreen() {
                                     );
                                     if (distance < minDistance) {
                                         minDistance = distance;
-                                        closestProperty = property;
+                                        bestProperty = property;
                                     }
                                 }
                             });
-
-                            if (closestProperty) {
-                                setSelectedProperty(closestProperty);
-                            } else {
-                                setSelectedProperty(null);
-                            }
-                        } else {
-                            // Fallback if permission denied
-                            setSelectedProperty(null);
                         }
                     } catch (locError) {
                         console.error('Error getting location:', locError);
-                        setSelectedProperty(null);
+                    }
+
+                    if (bestProperty) {
+                        setSelectedProperty(bestProperty);
                     }
                 }
             }
         } catch (e) {
             console.error('Error fetching properties:', e);
         }
-    }, []);
+    }, [params.sessionId]);
 
     useFocusEffect(
         useCallback(() => {
