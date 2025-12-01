@@ -9,7 +9,7 @@ interface RoomSelectorProps {
     onSelectRoom: (room: string) => void;
     onCustomRoom: () => void;
     itemWidth: number;
-    tapTargetRef: React.MutableRefObject<string | null>;
+    tapTargetRef: { current: string | null };
 }
 
 export function RoomSelector({
@@ -23,9 +23,17 @@ export function RoomSelector({
     const flatListRef = useRef<FlatList>(null);
     const isIOS = Platform.OS === 'ios';
     const liquidAvailable = isIOS && isLiquidGlassAvailable();
+    const screenHeight = Dimensions.get('window').height;
+
+    const baseMargin = liquidAvailable ? 87 : 2;
+    const extraPadding = screenHeight > 900 ? 4 : 0;
+    const finalMargin = baseMargin + extraPadding;
 
     return (
-        <View className={`absolute bottom-0 left-0 right-0 h-12 z-20 ${liquidAvailable ? 'mb-24' : 'mb-1'}`}>
+        <View 
+            className="absolute bottom-0 left-0 right-0 h-12 z-20"
+            style={{ marginBottom: finalMargin }}
+        >
             <LinearGradient
                 colors={['rgba(0,0,0,0.8)', 'transparent']}
                 start={{ x: 0, y: 0 }}
@@ -111,7 +119,7 @@ export function RoomSelector({
                                 >
                                     <Text
                                         numberOfLines={1}
-                                        className="text-xs font-medium text-white px-3 text-center w-full"
+                                        className="text-sm font-medium text-white px-3 text-center w-full"
                                     >
                                         {item}
                                     </Text>
@@ -130,7 +138,7 @@ export function RoomSelector({
                                 >
                                     <Text
                                         numberOfLines={1}
-                                        className={`text-xs font-medium text-center w-full ${selectedRoom === item
+                                        className={`text-sm font-medium text-center w-full ${selectedRoom === item
                                             ? 'text-white'
                                             : 'text-white/60'
                                             }`}

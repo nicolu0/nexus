@@ -14,7 +14,7 @@ export function ProfileMenu({ onSignOut, isOpen, onToggle }: ProfileMenuProps) {
     const liquidAvailable = isIOS && isLiquidGlassAvailable();
 
     return (
-        <View className="absolute right-4 top-2 z-20">
+        <View className="z-20 relative">
             <TouchableOpacity
                 onPress={onToggle}
                 activeOpacity={0.8}

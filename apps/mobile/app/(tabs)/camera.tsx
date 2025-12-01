@@ -6,11 +6,13 @@ import {
     StyleSheet,
     Alert,
     Dimensions,
+    Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
 import { CameraTopControls, CameraTopControlsHandle } from '../../components/md/CameraTopControls';
@@ -77,6 +79,7 @@ export default function CameraScreen() {
     const tapTargetRef = useRef<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const params = useLocalSearchParams<{ phase?: string; unitId?: string; sessionId?: string }>();
+    const [topControlsHeight, setTopControlsHeight] = useState(0);
     
     // We'll derive phase/session info from database state instead of params for robustness
     const [activeSession, setActiveSession] = useState<{ id: string; phase: 'move_in' | 'move_out'; tenancy_id: string } | null>(null);
@@ -582,19 +585,38 @@ export default function CameraScreen() {
 
     const screenWidth = Dimensions.get('window').width;
     const screenHeight = Dimensions.get('window').height;
+
+    // iphone 16 pro max is 956
+    // iphone 14 plus is 926
+    // iphone 16 pro is 874
+    // iphone 16 is 852
+    // console.log('screenHeight', screenHeight);
+    
+    const isIOS = Platform.OS === 'ios';
+    const liquidAvailable = isIOS && isLiquidGlassAvailable();
+    
+    const bottomMargin = liquidAvailable ? 134 : 131;
+    const captureButtonHeight = 75;
+    const bottomControlsTotalHeight = bottomMargin + captureButtonHeight;
+
     const camHeight = screenWidth * (4 / 3);
+    
+    const effectiveTopHeight = topControlsHeight || 100;
+    
+    const excessHeight = screenHeight - camHeight - effectiveTopHeight - bottomControlsTotalHeight;
+    
+    const topOverlayHeight = effectiveTopHeight + (excessHeight / 2);
 
     return (
         <View className="flex-1 bg-black">
-            {/* Fullscreen Camera */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
 
             {/* Overlays to create 4:3 visual mask */}
             <View className="flex-1 w-full">
                 <View 
                     style={{ 
-                        height: screenHeight * 0.13, 
-                        backgroundColor: 'rgba(0,0,0,0.5)' 
+                        height: topOverlayHeight, 
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)' 
                     }} 
                 />
                 <View 
@@ -606,8 +628,8 @@ export default function CameraScreen() {
                 />
                 <View 
                     style={{ 
-                        flex: 1, 
-                        backgroundColor: 'rgba(0,0,0,0.5)' 
+                        flex: 1,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)'
                     }} 
                 />
             </View>
@@ -616,6 +638,7 @@ export default function CameraScreen() {
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
                 <CameraTopControls
                     ref={topControlsRef}
+                    onLayout={(e) => setTopControlsHeight(e.nativeEvent.layout.height)}
                     properties={properties}
                     units={units}
                     selectedProperty={selectedProperty}

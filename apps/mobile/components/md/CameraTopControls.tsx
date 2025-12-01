@@ -1,5 +1,5 @@
 import React, { useState, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { View } from 'react-native';
+import { View, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { PropertySelector } from '../sm/PropertySelector';
@@ -26,6 +26,7 @@ interface CameraTopControlsProps {
     onSelectProperty: (property: Property) => void;
     onSelectUnit: (unit: Unit) => void;
     onSignOut: () => void;
+    onLayout?: (event: import('react-native').LayoutChangeEvent) => void;
 }
 
 export interface CameraTopControlsHandle {
@@ -42,9 +43,10 @@ export const CameraTopControls = forwardRef<CameraTopControlsHandle, CameraTopCo
     onSelectProperty,
     onSelectUnit,
     onSignOut,
+    onLayout,
 }, ref) => {
     const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
-
+    
     // Expose closeDropdowns method to parent
     useImperativeHandle(ref, () => ({
         closeDropdowns: () => setOpenMenu(null),
@@ -59,9 +61,17 @@ export const CameraTopControls = forwardRef<CameraTopControlsHandle, CameraTopCo
         }, [])
     );
 
+    const screenHeight = Dimensions.get('window').height;
+    const topPadding = screenHeight > 900 ? 'pt-8' : 'pt-2';
+
     return (
-        <SafeAreaView className="absolute top-0 left-0 right-0 z-10" pointerEvents="box-none">
-            <View className="flex-row justify-between px-4 pt-2" pointerEvents="box-none">
+        <SafeAreaView 
+            className="absolute top-0 left-0 right-0 z-10" 
+            pointerEvents="box-none"
+            onLayout={onLayout}
+            edges={['top']}
+        >
+            <View className={`flex-row justify-between items-center px-4 ${topPadding}`} pointerEvents="box-none">
                 {/* Selectors Container (Center) */}
                 <View className="flex-1 flex-row justify-center items-start gap-2 z-30" pointerEvents="box-none">
                     <PropertySelector

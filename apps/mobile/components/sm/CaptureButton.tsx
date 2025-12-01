@@ -13,7 +13,7 @@ export function CaptureButton({ onPress, disabled, activeSessionPhase }: Capture
     const liquidAvailable = isIOS && isLiquidGlassAvailable();
 
     return (
-        <View className={`absolute bottom-0 left-0 right-0 items-center z-20 ${liquidAvailable ? 'mb-36' : 'mb-14'}`} pointerEvents="box-none">
+        <View className={`absolute bottom-0 left-0 right-0 items-center z-20 ${liquidAvailable ? 'mb-[134px]' : 'mb-[46px]'}`} pointerEvents="box-none">
             <View className="relative flex-row items-center">
                 {activeSessionPhase && (
                     <View className="absolute right-[100px] bg-black/60 px-3 py-1.5 rounded-full border border-white/20">
@@ -28,8 +28,8 @@ export function CaptureButton({ onPress, disabled, activeSessionPhase }: Capture
                     onPress={onPress}
                     activeOpacity={0.7}
                     className={isIOS && isLiquidGlassAvailable()
-                        ? "w-[80px] h-[80px] rounded-full"
-                        : "w-[80px] h-[80px] rounded-full justify-center items-center"
+                        ? "w-[75px] h-[75px] rounded-full"
+                        : "w-[75px] h-[75px] rounded-full justify-center items-center"
                     }
                 >
                     <GlassView
@@ -41,7 +41,7 @@ export function CaptureButton({ onPress, disabled, activeSessionPhase }: Capture
                             !liquidAvailable && styles.glassFallback,
                         ]}
                     >
-                        <View className="w-[67px] h-[67px] rounded-full bg-white shadow-sm" />
+                        <View className="w-[63px] h-[63px] rounded-full bg-white shadow-sm" />
                     </GlassView>
                 </TouchableOpacity>
             </View>
@@ -52,9 +52,9 @@ export function CaptureButton({ onPress, disabled, activeSessionPhase }: Capture
 
 const styles = StyleSheet.create({
     glassButton: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: 75,
+      height: 75,
+      borderRadius: 37.5,
       justifyContent: 'center',
       alignItems: 'center',
     },
