@@ -8,6 +8,7 @@ import {
     Dimensions,
     Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -19,6 +20,7 @@ import { CameraTopControls, CameraTopControlsHandle } from '../../components/md/
 import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 import { ToastNotification } from '../../components/sm/ToastNotification';
+import { GhostImageThumbnail } from '../../components/sm/GhostImageThumbnail';
 import * as Location from 'expo-location';
 import { setStatusBarStyle } from 'expo-status-bar';
 
@@ -80,6 +82,8 @@ export default function CameraScreen() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const params = useLocalSearchParams<{ phase?: string; unitId?: string; sessionId?: string }>();
     const [topControlsHeight, setTopControlsHeight] = useState(0);
+    const [ghostGroups, setGhostGroups] = useState<{ id: string; room_id: string; imagePath: string }[]>([]);
+    const [ghostMode, setGhostMode] = useState<'overlay' | 'thumbnail'>('overlay');
     
     // We'll derive phase/session info from database state instead of params for robustness
     const [activeSession, setActiveSession] = useState<{ id: string; phase: 'move_in' | 'move_out'; tenancy_id: string } | null>(null);
@@ -167,6 +171,55 @@ export default function CameraScreen() {
             console.error('Error fetching session context:', e);
         }
     }
+
+    const fetchGhostGroups = useCallback(async (tenancyId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('groups')
+                .select(`
+                    id,
+                    room_id,
+                    images (
+                        path,
+                        session:sessions (
+                            phase
+                        )
+                    )
+                `)
+                .eq('tenancy_id', tenancyId);
+
+            if (error) throw error;
+
+            // Filter client-side
+            // We want groups that have a 'move_in' image but NO 'move_out' image.
+            const ghosts = (data || []).filter((g: any) => {
+                const images = g.images || [];
+                const hasMoveIn = images.some((img: any) => img.session?.phase === 'move_in');
+                const hasMoveOut = images.some((img: any) => img.session?.phase === 'move_out');
+                return hasMoveIn && !hasMoveOut;
+            }).map((g: any) => {
+                // Get the move-in image to display
+                const moveInImage = g.images.find((img: any) => img.session?.phase === 'move_in');
+                return {
+                    id: g.id,
+                    room_id: g.room_id,
+                    imagePath: moveInImage?.path
+                };
+            });
+
+            setGhostGroups(ghosts);
+        } catch (e) {
+            console.error('Error fetching ghost groups:', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeSession?.phase === 'move_out' && activeSession.tenancy_id) {
+            fetchGhostGroups(activeSession.tenancy_id);
+        } else {
+            setGhostGroups([]);
+        }
+    }, [activeSession, fetchGhostGroups]);
 
     const fetchActiveSession = useCallback(async (unitId: string) => {
         try {
@@ -336,6 +389,10 @@ export default function CameraScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
     }, [selectedRoom]);
+
+    const handleToggleGhostMode = useCallback(() => {
+        setGhostMode(prev => prev === 'overlay' ? 'thumbnail' : 'overlay');
+    }, []);
 
     const showToast = (message: string, type: 'success' | 'error') => {
         setToast({ message, type });
@@ -554,25 +611,33 @@ export default function CameraScreen() {
                 const tenancyId = await getTenancyId(selectedUnit.id);
                 const roomId = roomIdMap[selectedRoom];
 
-                // 1. Create Group
-                const { data: group, error: groupError } = await supabase
-                    .from('groups')
-                    .insert({
-                        name: selectedRoom,
-                        room_id: roomId,
-                        tenancy_id: tenancyId,
-                    })
-                    .select('id')
-                    .single();
+                // 1. Create Group OR Use Existing (for Move-out ghost matching)
+                // Check if we have a targeted ghost group to fill
+                const targetGhostGroup = ghostGroups.find(g => g.room_id === roomId);
+                
+                let groupId = targetGhostGroup?.id;
 
-                if (groupError) throw groupError;
+                if (!groupId) {
+                    const { data: group, error: groupError } = await supabase
+                        .from('groups')
+                        .insert({
+                            name: selectedRoom,
+                            room_id: roomId,
+                            tenancy_id: tenancyId,
+                        })
+                        .select('id')
+                        .single();
+
+                    if (groupError) throw groupError;
+                    groupId = group.id;
+                }
 
                 // 2. Create Image (link session if active)
                 const { error: dbError } = await supabase
                     .from('images')
                     .insert({
                         path: storagePath,
-                        group_id: group.id,
+                        group_id: groupId,
                         mime_type: 'image/jpeg',
                         session_id: activeSession?.id
                     });
@@ -583,6 +648,11 @@ export default function CameraScreen() {
                 } else {
                     console.log('Image metadata saved to database');
                     showToast('Photo saved!', 'success');
+                    
+                    // If we filled a ghost group, refresh the list so the overlay disappears
+                    if (targetGhostGroup && activeSession?.tenancy_id) {
+                        fetchGhostGroups(activeSession.tenancy_id);
+                    }
                 }
             }
         } catch (e) {
@@ -624,16 +694,47 @@ export default function CameraScreen() {
     
     const topOverlayHeight = effectiveTopHeight + (excessHeight / 2);
 
+    const currentGhostGroup = selectedRoom ? ghostGroups.find(g => g.room_id === roomIdMap[selectedRoom]) : null;
+    const ghostImageUrl = currentGhostGroup?.imagePath 
+        ? supabase.storage.from('unit-images').getPublicUrl(currentGhostGroup.imagePath).data.publicUrl 
+        : null;
+
     return (
         <View className="flex-1 bg-black">
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
+            
+            {ghostImageUrl && (
+                ghostMode === 'overlay' ? (
+                    <Image
+                        source={{ uri: ghostImageUrl }}
+                        style={{
+                            position: 'absolute',
+                            top: topOverlayHeight,
+                            width: screenWidth,
+                            height: camHeight,
+                            opacity: 0.3,
+                            zIndex: 5
+                        }}
+                        contentFit="cover"
+                    />
+                ) : (
+                    <GhostImageThumbnail
+                        imageUrl={ghostImageUrl}
+                        onPress={handleToggleGhostMode}
+                        top={topOverlayHeight + 16}
+                        left={16}
+                        width={screenWidth * 0.3}
+                        height={(screenWidth * 0.3) * (4/3)}
+                    />
+                )
+            )}
 
-            {/* Overlays to create 4:3 visual mask */}
-            <View className="flex-1 w-full">
+            {/* Overlays to create 4:3 visual mask - HIGH Z-INDEX to cover ghost image */}
+            <View className="flex-1 w-full z-10" pointerEvents="none">
                 <View 
                     style={{ 
                         height: topOverlayHeight, 
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)' 
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)' 
                     }} 
                 />
                 <View 
@@ -646,7 +747,7 @@ export default function CameraScreen() {
                 <View 
                     style={{ 
                         flex: 1,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)'
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)'
                     }} 
                 />
             </View>
@@ -675,6 +776,8 @@ export default function CameraScreen() {
                     itemWidth={ITEM_WIDTH}
                     tapTargetRef={tapTargetRef}
                     activeSessionPhase={activeSession?.phase}
+                    ghostMode={ghostImageUrl ? ghostMode : undefined}
+                    onToggleGhostMode={ghostImageUrl ? handleToggleGhostMode : undefined}
                 />
             </View>
 

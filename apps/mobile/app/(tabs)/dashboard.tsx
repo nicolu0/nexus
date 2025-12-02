@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -65,9 +65,6 @@ function computeTenancyStatus(
     return 'Active';
 }
 
-// Outside component
-let hasAutoSelected = false;
-
 export default function DashboardScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -89,6 +86,7 @@ export default function DashboardScreen() {
     const [unitModalVisible, setUnitModalVisible] = useState(false);
 
     const insets = useSafeAreaInsets();
+    const hasAutoSelectedRef = useRef(false);
     
     const loadDashboard = React.useCallback(async () => {
         try {
@@ -137,8 +135,8 @@ export default function DashboardScreen() {
             const castProps = (propsData ?? []) as any as Property[];
             setProperties(castProps);
 
-            if (!hasAutoSelected && !selectedPropertyId && castProps.length > 0) {
-                hasAutoSelected = true;
+            if (!hasAutoSelectedRef.current && !selectedPropertyId && castProps.length > 0) {
+                hasAutoSelectedRef.current = true;
                 // Default to first, but try to find closest
                 let bestId = castProps[0].id;
 

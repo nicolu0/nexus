@@ -8,44 +8,46 @@ interface CaptureButtonProps {
     activeSessionPhase?: string;
 }
 
-export function CaptureButton({ onPress, disabled, activeSessionPhase }: CaptureButtonProps) {
+export function CaptureButton({ 
+    onPress, 
+    disabled, 
+    activeSessionPhase
+}: CaptureButtonProps) {
     const isIOS = Platform.OS === 'ios';
     const liquidAvailable = isIOS && isLiquidGlassAvailable();
 
     return (
-        <View className={`absolute bottom-0 left-0 right-0 items-center z-20 ${liquidAvailable ? 'mb-[134px]' : 'mb-[46px]'}`} pointerEvents="box-none">
-            <View className="relative flex-row items-center">
-                {activeSessionPhase && (
-                    <View className="absolute right-[100px] bg-black/60 px-3 py-1.5 rounded-full border border-white/20">
-                        <Text className="text-white text-xs font-medium capitalize whitespace-nowrap">
-                            {activeSessionPhase.replace('_', ' ')}
-                        </Text>
-                    </View>
-                )}
+        <>
+            {activeSessionPhase && (
+                <View className="absolute right-[100px] bg-black/60 px-3 py-1.5 rounded-full border border-white/20">
+                    <Text className="text-white text-xs font-medium capitalize whitespace-nowrap">
+                        {activeSessionPhase.replace('_', ' ')}
+                    </Text>
+                </View>
+            )}
 
-                <TouchableOpacity
-                    disabled={disabled}
-                    onPress={onPress}
-                    activeOpacity={0.7}
-                    className={isIOS && isLiquidGlassAvailable()
-                        ? "w-[75px] h-[75px] rounded-full"
-                        : "w-[75px] h-[75px] rounded-full justify-center items-center"
-                    }
+            <TouchableOpacity
+                disabled={disabled}
+                onPress={onPress}
+                activeOpacity={0.7}
+                className={isIOS && isLiquidGlassAvailable()
+                    ? "w-[75px] h-[75px] rounded-full"
+                    : "w-[75px] h-[75px] rounded-full justify-center items-center"
+                }
+            >
+                <GlassView
+                    glassEffectStyle='regular'
+                    isInteractive
+                    tintColor='rgba(255, 255, 255, 0.2)'
+                    style={[
+                        styles.glassButton,
+                        !liquidAvailable && styles.glassFallback,
+                    ]}
                 >
-                    <GlassView
-                        glassEffectStyle='regular'
-                        isInteractive
-                        tintColor='rgba(255, 255, 255, 0.2)'
-                        style={[
-                            styles.glassButton,
-                            !liquidAvailable && styles.glassFallback,
-                        ]}
-                    >
-                        <View className="w-[63px] h-[63px] rounded-full bg-white shadow-sm" />
-                    </GlassView>
-                </TouchableOpacity>
-            </View>
-        </View>
+                    <View className="w-[63px] h-[63px] rounded-full bg-white shadow-sm" />
+                </GlassView>
+            </TouchableOpacity>
+        </>
     );
 }
 
