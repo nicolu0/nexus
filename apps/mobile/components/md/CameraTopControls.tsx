@@ -66,7 +66,7 @@ export const CameraTopControls = forwardRef<CameraTopControlsHandle, CameraTopCo
 
     return (
         <SafeAreaView 
-            className="absolute top-0 left-0 right-0 z-10" 
+            className="absolute top-0 left-0 right-0 z-10"
             pointerEvents="box-none"
             onLayout={onLayout}
             edges={['top']}

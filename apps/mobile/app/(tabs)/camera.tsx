@@ -735,7 +735,7 @@ export default function CameraScreen() {
                     style={{ 
                         height: topOverlayHeight, 
                         backgroundColor: 'rgba(0, 0, 0, 0.75)' 
-                    }} 
+                    }}
                 />
                 <View 
                     style={{ 
@@ -794,6 +794,8 @@ export default function CameraScreen() {
                     message={toast.message}
                     type={toast.type}
                     onDismiss={() => setToast(null)}
+                    topOverlayHeight={topOverlayHeight}
+                    excessHeight={excessHeight}
                 />
             )}
         </View >
