@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Animated, Dimensions, StyleSheet, Easing, ActivityIndicator, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -42,6 +43,8 @@ export function SessionSidePanel({
     const screenWidth = Dimensions.get('window').width;
     const slideAnim = useRef(new Animated.Value(screenWidth)).current;
     const [selectedImage, setSelectedImage] = useState<{ id: string; path: string; created_at: string; groups: { id: string; name: string; room_id: string } | null } | null>(null);
+    const [requiredMoveInGroups, setRequiredMoveInGroups] = useState<{ id: string; name: string | null }[]>([]);
+    const [requiredGroupsLoaded, setRequiredGroupsLoaded] = useState(true);
 
     useEffect(() => {
         if (selectedSession) {
@@ -80,7 +83,83 @@ export function SessionSidePanel({
         return sessionImages.filter(img => img.groups?.name === sessionRoomFilter);
     }, [sessionImages, sessionRoomFilter]);
 
+    // Fetch move-in groups for move-out sessions
+    useEffect(() => {
+        const loadRequiredGroups = async () => {
+            if (selectedSession?.phase === 'move_out' && selectedSession.tenancies?.id) {
+                setRequiredGroupsLoaded(false);
+                try {
+                    const { data, error } = await supabase
+                        .from('groups')
+                        .select(`
+                            id,
+                            name,
+                            images (
+                                session_id,
+                                session:sessions (
+                                    phase
+                                )
+                            )
+                        `)
+                        .eq('tenancy_id', selectedSession.tenancies.id);
+
+                    if (error) throw error;
+
+                    const moveInGroups = (data || []).filter((group: any) => {
+                        const images = group.images || [];
+                        return images.some((img: any) => img.session?.phase === 'move_in');
+                    }).map((group: any) => ({
+                        id: group.id,
+                        name: group.name || 'Unnamed Room',
+                    }));
+
+                    setRequiredMoveInGroups(moveInGroups);
+                } catch (err) {
+                    console.error('Failed to load move-in groups:', err);
+                    setRequiredMoveInGroups([]);
+                } finally {
+                    setRequiredGroupsLoaded(true);
+                }
+            } else {
+                setRequiredMoveInGroups([]);
+                setRequiredGroupsLoaded(true);
+            }
+        };
+
+        loadRequiredGroups();
+    }, [selectedSession]);
+
+    const matchedGroupIds = React.useMemo(() => {
+        const ids = new Set<string>();
+        sessionImages.forEach((img) => {
+            if (img.groups?.id) ids.add(img.groups.id);
+        });
+        return ids;
+    }, [sessionImages]);
+
+    const unmatchedGroupNames = React.useMemo(() => {
+        if (selectedSession?.phase !== 'move_out') return [];
+        return requiredMoveInGroups
+            .filter((group) => !matchedGroupIds.has(group.id))
+            .map((group) => group.name || 'Unnamed Room');
+    }, [selectedSession, requiredMoveInGroups, matchedGroupIds]);
+
     const handleEndSession = () => {
+        if (selectedSession?.phase === 'move_out') {
+            if (!requiredGroupsLoaded) {
+                Alert.alert('Still loading', 'Please wait a moment and try again.');
+                return;
+            }
+
+            if (unmatchedGroupNames.length > 0) {
+                Alert.alert(
+                    'Match move-in photos',
+                    'There are still move-in photos that need to be matched!',
+                );
+                return;
+            }
+        }
+
         Alert.alert(
             "End Session",
             "Are you sure you want to end this session? This will mark it as completed.",
@@ -146,21 +225,14 @@ export function SessionSidePanel({
                         </View>
                     </View>
                     
-                    {selectedSession?.status === 'in_progress' && onEndSession ? (
+                    {selectedSession?.status === 'in_progress' && onEndSession && (
                         <TouchableOpacity 
                             onPress={handleEndSession}
                             className="bg-red-500 px-4 py-2 rounded-full"
                         >
                             <Text className="text-white text-sm font-semibold">End Session</Text>
                         </TouchableOpacity>
-                    ) : selectedSession?.status === 'completed' && selectedSession?.phase === 'move_in' && onStartMoveOut ? (
-                        <TouchableOpacity 
-                            onPress={onStartMoveOut}
-                            className="bg-black px-4 py-2 rounded-full"
-                        >
-                            <Text className="text-white text-sm font-semibold">Start Move-out</Text>
-                        </TouchableOpacity>
-                    ) : null}
+                    )}
                 </View>
 
                 {/* Room Filters */}
@@ -201,8 +273,9 @@ export function SessionSidePanel({
                                 >
                                     <Image
                                         source={{ uri: publicUrl }}
-                                        className="w-full h-full bg-stone-200"
-                                        resizeMode="cover"
+                                        style={{ width: '100%', height: '100%', backgroundColor: '#e7e5e4' }}
+                                        contentFit="cover"
+                                        transition={200}
                                     />
                                     {item.groups?.name && (
                                         <View className="absolute top-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded">
@@ -231,6 +304,8 @@ export function SessionSidePanel({
                         await onDeleteImage(selectedImage.id);
                         onRefreshSessions?.();
                     }}
+                    isCompleted={selectedSession?.status === 'completed'}
+                    isMoveOut={selectedSession?.phase === 'move_out'}
                 />
             )}
         </Animated.View>

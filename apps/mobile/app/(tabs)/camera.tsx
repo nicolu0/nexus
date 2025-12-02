@@ -6,21 +6,23 @@ import {
     StyleSheet,
     Alert,
     Dimensions,
+    Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { usePhotos } from '../../context/PhotoContext';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system';
 import { CameraTopControls, CameraTopControlsHandle } from '../../components/md/CameraTopControls';
 import { CameraBottomControls } from '../../components/md/CameraBottomControls';
 import { CustomRoomModal } from '../../components/md/CustomRoomModal';
 import { ToastNotification } from '../../components/sm/ToastNotification';
+import { GhostImageThumbnail } from '../../components/sm/GhostImageThumbnail';
 import * as Location from 'expo-location';
 import { setStatusBarStyle } from 'expo-status-bar';
-
-let hasAutoSelected = false;
 
 async function uploadPhotoToSupabase(uri: string) {
     const ext = 'jpg';
@@ -59,6 +61,7 @@ async function uploadPhotoToSupabase(uri: string) {
 }
 
 export default function CameraScreen() {
+    const hasAutoSelectedRef = useRef(false);
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView>(null);
     const topControlsRef = useRef<CameraTopControlsHandle>(null);
@@ -75,8 +78,13 @@ export default function CameraScreen() {
     const [showCustomRoomModal, setShowCustomRoomModal] = useState(false);
     const [customRoomText, setCustomRoomText] = useState('');
     const tapTargetRef = useRef<string | null>(null);
+    const pendingUnitIdRef = useRef<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const params = useLocalSearchParams<{ phase?: string; unitId?: string; sessionId?: string }>();
+    const [topControlsHeight, setTopControlsHeight] = useState(0);
+    const [ghostGroups, setGhostGroups] = useState<{ id: string; room_id: string; imagePath: string }[]>([]);
+    const [ghostGroupsLoaded, setGhostGroupsLoaded] = useState(false);
+    const [ghostMode, setGhostMode] = useState<'overlay' | 'thumbnail'>('thumbnail');
     
     // We'll derive phase/session info from database state instead of params for robustness
     const [activeSession, setActiveSession] = useState<{ id: string; phase: 'move_in' | 'move_out'; tenancy_id: string } | null>(null);
@@ -126,11 +134,17 @@ export default function CameraScreen() {
             if (error || !session) return;
 
             // @ts-ignore - complex nested join type
-            const unitData = session.tenancies?.units;
+            let unitData = session.tenancies?.units;
+            if (Array.isArray(unitData)) unitData = unitData[0];
+
             // @ts-ignore
-            const propertyData = unitData?.properties;
+            let propertyData = unitData?.properties;
+            if (Array.isArray(propertyData)) propertyData = propertyData[0];
 
             if (unitData && propertyData) {
+                // Set pending unit ID to prevent fetchUnits from clearing it
+                pendingUnitIdRef.current = unitData.id;
+
                 // Set property first
                 setSelectedProperty({
                     id: propertyData.id,
@@ -159,7 +173,61 @@ export default function CameraScreen() {
         }
     }
 
-    async function fetchActiveSession(unitId: string) {
+    const fetchGhostGroups = useCallback(async (tenancyId: string) => {
+        try {
+            setGhostGroupsLoaded(false);
+            const { data, error } = await supabase
+                .from('groups')
+                .select(`
+                    id,
+                    room_id,
+                    images (
+                        path,
+                        session:sessions (
+                            phase
+                        )
+                    )
+                `)
+                .eq('tenancy_id', tenancyId);
+
+            if (error) throw error;
+
+            // Filter client-side
+            // We want groups that have a 'move_in' image but NO 'move_out' image.
+            const ghosts = (data || []).filter((g: any) => {
+                const images = g.images || [];
+                const hasMoveIn = images.some((img: any) => img.session?.phase === 'move_in');
+                const hasMoveOut = images.some((img: any) => img.session?.phase === 'move_out');
+                return hasMoveIn && !hasMoveOut;
+            }).map((g: any) => {
+                // Get the move-in image to display
+                const moveInImage = g.images.find((img: any) => img.session?.phase === 'move_in');
+                return {
+                    id: g.id,
+                    room_id: g.room_id,
+                    imagePath: moveInImage?.path
+                };
+            });
+
+            setGhostGroups(ghosts);
+            setGhostGroupsLoaded(true);
+        } catch (e) {
+            console.error('Error fetching ghost groups:', e);
+            setGhostGroups([]);
+            setGhostGroupsLoaded(true);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeSession?.phase === 'move_out' && activeSession.tenancy_id) {
+            fetchGhostGroups(activeSession.tenancy_id);
+        } else {
+            setGhostGroups([]);
+            setGhostGroupsLoaded(false);
+        }
+    }, [activeSession, fetchGhostGroups]);
+
+    const fetchActiveSession = useCallback(async (unitId: string) => {
         try {
             // Find active tenancy for unit
             const { data: tenancies } = await supabase
@@ -220,7 +288,7 @@ export default function CameraScreen() {
             console.error('Error fetching active session:', err);
             setActiveSession(null);
         }
-    }
+    }, []);
 
     useEffect(() => {
         if (showCustomRoomModal) {
@@ -230,6 +298,69 @@ export default function CameraScreen() {
 
     const ITEM_WIDTH = 110;
 
+    const fetchProperties = useCallback(async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('properties')
+                .select('id, name, latitude, longitude')
+                .eq('owner_id', user.id)
+                .order('name');
+
+            if (error) throw error;
+
+            if (data) {
+                setProperties(data);
+
+                if (params.sessionId) {
+                    hasAutoSelectedRef.current = true;
+                    return; 
+                }
+
+                if (!hasAutoSelectedRef.current) {
+                    hasAutoSelectedRef.current = true;
+                    
+                    let bestProperty = data.length > 0 ? data[0] : null;
+
+                    try {
+                        const { status } = await Location.requestForegroundPermissionsAsync();
+                        if (status === 'granted') {
+                            const location = await Location.getCurrentPositionAsync({});
+                            const { latitude, longitude } = location.coords;
+
+                            let minDistance = Infinity;
+
+                            data.forEach(property => {
+                                if (property.latitude && property.longitude) {
+                                    const distance = getDistanceFromLatLonInKm(
+                                        latitude,
+                                        longitude,
+                                        property.latitude,
+                                        property.longitude
+                                    );
+                                    if (distance < minDistance) {
+                                        minDistance = distance;
+                                        bestProperty = property;
+                                    }
+                                }
+                            });
+                        }
+                    } catch (locError) {
+                        console.error('Error getting location:', locError);
+                    }
+
+                    if (bestProperty) {
+                        setSelectedProperty(bestProperty);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Error fetching properties:', e);
+        }
+    }, [params.sessionId]);
+
     useFocusEffect(
         useCallback(() => {
             setStatusBarStyle('light');
@@ -238,7 +369,7 @@ export default function CameraScreen() {
             if (selectedUnit) {
                 fetchActiveSession(selectedUnit.id);
             }
-        }, [selectedUnit]) // Add selectedUnit as dependency to re-run if it changes or on focus
+        }, [selectedUnit, fetchProperties, fetchActiveSession]) // Add selectedUnit as dependency to re-run if it changes or on focus
     );
 
     React.useEffect(() => {
@@ -265,72 +396,13 @@ export default function CameraScreen() {
         }
     }, [selectedRoom]);
 
+    const handleToggleGhostMode = useCallback(() => {
+        setGhostMode(prev => prev === 'overlay' ? 'thumbnail' : 'overlay');
+    }, []);
+
     const showToast = (message: string, type: 'success' | 'error') => {
         setToast({ message, type });
     };
-
-    async function fetchProperties() {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data, error } = await supabase
-                .from('properties')
-                .select('id, name, latitude, longitude')
-                .eq('owner_id', user.id)
-                .order('name');
-
-            if (error) throw error;
-
-            if (data) {
-                setProperties(data);
-
-                // Try to find closest property
-                if (!hasAutoSelected) {
-                    hasAutoSelected = true;
-                    try {
-                        const { status } = await Location.requestForegroundPermissionsAsync();
-                        if (status === 'granted') {
-                            const location = await Location.getCurrentPositionAsync({});
-                            const { latitude, longitude } = location.coords;
-
-                            let closestProperty = null;
-                            let minDistance = Infinity;
-
-                            data.forEach(property => {
-                                if (property.latitude && property.longitude) {
-                                    const distance = getDistanceFromLatLonInKm(
-                                        latitude,
-                                        longitude,
-                                        property.latitude,
-                                        property.longitude
-                                    );
-                                    if (distance < minDistance) {
-                                        minDistance = distance;
-                                        closestProperty = property;
-                                    }
-                                }
-                            });
-
-                            if (closestProperty) {
-                                setSelectedProperty(closestProperty);
-                            } else {
-                                setSelectedProperty(null);
-                            }
-                        } else {
-                            // Fallback if permission denied
-                            setSelectedProperty(null);
-                        }
-                    } catch (locError) {
-                        console.error('Error getting location:', locError);
-                        setSelectedProperty(null);
-                    }
-                }
-            }
-        } catch (e) {
-            console.error('Error fetching properties:', e);
-        }
-    }
 
     function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
         var R = 6371; // Radius of the earth in km
@@ -362,7 +434,16 @@ export default function CameraScreen() {
 
             if (data) {
                 setUnits(data);
-                setSelectedUnit(null);
+                
+                const pendingId = pendingUnitIdRef.current;
+                const foundUnit = pendingId ? data.find(u => u.id === pendingId) : null;
+                
+                if (foundUnit) {
+                    setSelectedUnit(foundUnit);
+                    pendingUnitIdRef.current = null;
+                } else {
+                    setSelectedUnit(null);
+                }
             }
         } catch (e) {
             console.error('Error fetching units:', e);
@@ -448,6 +529,8 @@ export default function CameraScreen() {
         const normalizedNewRoom = customRoomText.trim().toLowerCase();
         if (rooms.some(r => r.toLowerCase() === normalizedNewRoom)) {
             showToast('Room already exists!', 'error');
+            setCustomRoomText('');
+            setShowCustomRoomModal(false);
             return;
         }
 
@@ -506,7 +589,11 @@ export default function CameraScreen() {
             return;
         }
 
-        // Haptic feedback
+        if (!activeSession) {
+            showToast('Start a session in dashboard to take photos!', 'error');
+            return;
+        }
+
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         setCapturing(true);
@@ -530,25 +617,33 @@ export default function CameraScreen() {
                 const tenancyId = await getTenancyId(selectedUnit.id);
                 const roomId = roomIdMap[selectedRoom];
 
-                // 1. Create Group
-                const { data: group, error: groupError } = await supabase
-                    .from('groups')
-                    .insert({
-                        name: selectedRoom,
-                        room_id: roomId,
-                        tenancy_id: tenancyId,
-                    })
-                    .select('id')
-                    .single();
+                // 1. Create Group OR Use Existing (for Move-out ghost matching)
+                // Check if we have a targeted ghost group to fill
+                const targetGhostGroup = ghostGroups.find(g => g.room_id === roomId);
+                
+                let groupId = targetGhostGroup?.id;
 
-                if (groupError) throw groupError;
+                if (!groupId) {
+                    const { data: group, error: groupError } = await supabase
+                        .from('groups')
+                        .insert({
+                            name: selectedRoom,
+                            room_id: roomId,
+                            tenancy_id: tenancyId,
+                        })
+                        .select('id')
+                        .single();
+
+                    if (groupError) throw groupError;
+                    groupId = group.id;
+                }
 
                 // 2. Create Image (link session if active)
                 const { error: dbError } = await supabase
                     .from('images')
                     .insert({
                         path: storagePath,
-                        group_id: group.id,
+                        group_id: groupId,
                         mime_type: 'image/jpeg',
                         session_id: activeSession?.id
                     });
@@ -559,6 +654,11 @@ export default function CameraScreen() {
                 } else {
                     console.log('Image metadata saved to database');
                     showToast('Photo saved!', 'success');
+                    
+                    // If we filled a ghost group, refresh the list so the overlay disappears
+                    if (targetGhostGroup && activeSession?.tenancy_id) {
+                        fetchGhostGroups(activeSession.tenancy_id);
+                    }
                 }
             }
         } catch (e) {
@@ -578,20 +678,81 @@ export default function CameraScreen() {
 
     const screenWidth = Dimensions.get('window').width;
     const screenHeight = Dimensions.get('window').height;
+
+    // iphone 16 pro max is 956
+    // iphone 14 plus is 926
+    // iphone 16 pro is 874
+    // iphone 16 is 852
+    // console.log('screenHeight', screenHeight);
+    
+    const isIOS = Platform.OS === 'ios';
+    const liquidAvailable = isIOS && isLiquidGlassAvailable();
+    
+    const bottomMargin = liquidAvailable ? 134 : 131;
+    const captureButtonHeight = 75;
+    const bottomControlsTotalHeight = bottomMargin + captureButtonHeight;
+
     const camHeight = screenWidth * (4 / 3);
+    
+    const effectiveTopHeight = topControlsHeight || 100;
+    
+    const excessHeight = screenHeight - camHeight - effectiveTopHeight - bottomControlsTotalHeight;
+    
+    const topOverlayHeight = effectiveTopHeight + (excessHeight / 2);
+
+    const currentGhostGroup = selectedRoom ? ghostGroups.find(g => g.room_id === roomIdMap[selectedRoom]) : null;
+    const ghostImageUrl = currentGhostGroup?.imagePath 
+        ? supabase.storage.from('unit-images').getPublicUrl(currentGhostGroup.imagePath).data.publicUrl 
+        : null;
+
+    // Check if selected room is completed (all move-in photos matched) during move-out phase
+    // Only mark as completed if we're in move-out phase, have a selected room with a roomId,
+    // ghostGroups has been loaded, and the room is NOT in ghostGroups (meaning all move-in photos are matched)
+    const isSelectedRoomCompleted = Boolean(
+        activeSession?.phase === 'move_out' && 
+        selectedRoom && 
+        roomIdMap[selectedRoom] &&
+        ghostGroupsLoaded && // Only mark as completed if ghostGroups has been loaded
+        !ghostGroups.some(g => g.room_id === roomIdMap[selectedRoom])
+    );
 
     return (
         <View className="flex-1 bg-black">
-            {/* Fullscreen Camera */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
+            
+            {ghostImageUrl && (
+                ghostMode === 'overlay' ? (
+                    <Image
+                        source={{ uri: ghostImageUrl }}
+                        style={{
+                            position: 'absolute',
+                            top: topOverlayHeight,
+                            width: screenWidth,
+                            height: camHeight,
+                            opacity: 0.3,
+                            zIndex: 5
+                        }}
+                        contentFit="cover"
+                    />
+                ) : (
+                    <GhostImageThumbnail
+                        imageUrl={ghostImageUrl}
+                        onPress={handleToggleGhostMode}
+                        top={topOverlayHeight + 16}
+                        left={16}
+                        width={screenWidth * 0.3}
+                        height={(screenWidth * 0.3) * (4/3)}
+                    />
+                )
+            )}
 
-            {/* Overlays to create 4:3 visual mask */}
-            <View className="flex-1 w-full">
+            {/* Overlays to create 4:3 visual mask - HIGH Z-INDEX to cover ghost image */}
+            <View className="flex-1 w-full z-10" pointerEvents="none">
                 <View 
                     style={{ 
-                        height: screenHeight * 0.13, 
-                        backgroundColor: 'rgba(0,0,0,0.5)' 
-                    }} 
+                        height: topOverlayHeight, 
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)' 
+                    }}
                 />
                 <View 
                     style={{ 
@@ -602,8 +763,8 @@ export default function CameraScreen() {
                 />
                 <View 
                     style={{ 
-                        flex: 1, 
-                        backgroundColor: 'rgba(0,0,0,0.5)' 
+                        flex: 1,
+                        backgroundColor: 'rgba(0, 0, 0, 0.75)'
                     }} 
                 />
             </View>
@@ -612,6 +773,7 @@ export default function CameraScreen() {
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
                 <CameraTopControls
                     ref={topControlsRef}
+                    onLayout={(e) => setTopControlsHeight(e.nativeEvent.layout.height)}
                     properties={properties}
                     units={units}
                     selectedProperty={selectedProperty}
@@ -631,6 +793,9 @@ export default function CameraScreen() {
                     itemWidth={ITEM_WIDTH}
                     tapTargetRef={tapTargetRef}
                     activeSessionPhase={activeSession?.phase}
+                    ghostMode={ghostImageUrl ? ghostMode : undefined}
+                    onToggleGhostMode={ghostImageUrl ? handleToggleGhostMode : undefined}
+                    isSelectedRoomCompleted={isSelectedRoomCompleted}
                 />
             </View>
 
@@ -647,6 +812,8 @@ export default function CameraScreen() {
                     message={toast.message}
                     type={toast.type}
                     onDismiss={() => setToast(null)}
+                    topOverlayHeight={topOverlayHeight}
+                    excessHeight={excessHeight}
                 />
             )}
         </View >

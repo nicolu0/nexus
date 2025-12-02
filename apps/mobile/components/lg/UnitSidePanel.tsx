@@ -1,10 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, Animated, Dimensions, StyleSheet, Easing } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, FlatList, Animated, Dimensions, StyleSheet, Easing } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { RoomFilter } from '../sm/RoomFilter';
+import { GroupImageModal } from '../md/GroupImageModal';
 import { Unit, Property, Tenancy, GroupRow, Room, ImageRow } from '../../types';
 
 type UnitSidePanelProps = {
@@ -20,6 +22,7 @@ type UnitSidePanelProps = {
     roomFilterId: string | null;
     setRoomFilterId: (id: string | null) => void;
     activeSessionsMap: Record<string, string>;
+    completedMoveInMap: Record<string, boolean>;
 };
 
 export function UnitSidePanel({
@@ -31,11 +34,54 @@ export function UnitSidePanel({
     roomFilterId,
     setRoomFilterId,
     activeSessionsMap,
+    completedMoveInMap,
 }: UnitSidePanelProps) {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const screenWidth = Dimensions.get('window').width;
     const slideAnim = useRef(new Animated.Value(screenWidth)).current;
+    const [selectedGroup, setSelectedGroup] = useState<GroupRow | null>(null);
+    const [groupModalVisible, setGroupModalVisible] = useState(false);
+
+    // Logic to determine if "Start Move-out" button should be shown in header
+    const showStartMoveOut = selectedUnitMeta?.tenancy?.id 
+        && !activeSessionsMap[selectedUnitMeta.tenancy.id] 
+        && completedMoveInMap[selectedUnitMeta.tenancy.id];
+
+    const handleStartMoveOut = async () => {
+        if (!selectedUnitMeta?.tenancy) return;
+        onClose();
+        try {
+            const { data: sessionData, error: sessionError } = await supabase
+                .from('sessions')
+                .insert({
+                    tenancy_id: selectedUnitMeta.tenancy.id,
+                    phase: 'move_out',
+                    status: 'in_progress',
+                    created_by: (await supabase.auth.getUser()).data.user?.id
+                })
+                .select('id')
+                .single();
+
+            if (sessionError) throw sessionError;
+
+            router.push({
+                pathname: '/(tabs)/camera',
+                params: {
+                    phase: 'move_out',
+                    unitId: selectedUnitMeta.unit.id,
+                    sessionId: sessionData.id
+                }
+            });
+        } catch (e) {
+            console.error('Error creating move-out session:', e);
+            // Fallback
+            router.push({
+                pathname: '/(tabs)/camera',
+                params: { phase: 'move_out', unitId: selectedUnitMeta.unit.id }
+            });
+        }
+    };
 
     useEffect(() => {
         if (visible) {
@@ -83,7 +129,7 @@ export function UnitSidePanel({
             <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
                 {/* Modal header */}
                 <View className="px-4 pt-2 pb-3 border-b border-gray-200 flex-row items-center justify-between">
-                    <View className="flex-row items-center">
+                    <View className="flex-row items-center flex-1">
                         <TouchableOpacity
                             onPress={() => {
                                 onClose();
@@ -111,6 +157,16 @@ export function UnitSidePanel({
                             )}
                         </View>
                     </View>
+
+                    {/* Right side: Start Move-out Button */}
+                    {showStartMoveOut && (
+                        <TouchableOpacity
+                            onPress={handleStartMoveOut}
+                            className="bg-black px-3.5 py-2.5 rounded-full"
+                        >
+                            <Text className="text-white text-sm font-semibold">Start Move-out</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* Room filter + groups */}
@@ -224,30 +280,67 @@ export function UnitSidePanel({
 
                                     // Determine if ANY image in this group belongs to an in-progress session
                                     const isInProgress = item.images?.some(img => img.session?.status === 'in_progress');
+                                    
+                                    // Check if group has multiple images (move-in and move-out)
+                                    const hasMoveIn = item.images?.some(img => img.session?.phase === 'move_in') ?? false;
+                                    const hasMoveOut = item.images?.some(img => img.session?.phase === 'move_out') ?? false;
+                                    const hasMultipleImages = hasMoveIn && hasMoveOut && (item.images?.length ?? 0) > 1;
+
+                                    const handleGroupPress = () => {
+                                        if (hasMultipleImages) {
+                                            setSelectedGroup(item);
+                                            setGroupModalVisible(true);
+                                        }
+                                    };
 
                                     return (
                                         <View className="w-1/2 p-1">
                                             <TouchableOpacity 
-                                                className={`bg-white rounded-xl overflow-hidden ${isInProgress 
+                                                onPress={handleGroupPress}
+                                                disabled={!hasMultipleImages}
+                                                className={`bg-white rounded-xl overflow-visible ${isInProgress 
                                                     ? 'border border-dashed border-stone-300' 
                                                     : 'border border-gray-200'
-                                                }`}
+                                                } ${hasMultipleImages ? 'active:opacity-80' : ''}`}
                                             >
-                                                {publicUrl ? (
-                                                    <Image
-                                                        source={{ uri: publicUrl }}
-                                                        className="w-full h-28"
-                                                        resizeMode="cover"
-                                                    />
-                                                ) : (
-                                                    <View className="w-full h-28 bg-gray-200 justify-center items-center">
-                                                        <Ionicons
-                                                            name="image-outline"
-                                                            size={24}
-                                                            color="#9ca3af"
+                                                <View className="relative w-full" style={{ height: 112 }}>
+                                                    {/* Peeking box for multiple images */}
+                                                    {hasMultipleImages && (
+                                                        <View 
+                                                            className="absolute bg-stone-300 rounded-lg"
+                                                            style={{
+                                                                top: -4,
+                                                                left: 6,
+                                                                right: 6,
+                                                                height: 96,
+                                                                zIndex: 0,
+                                                            }}
                                                         />
+                                                    )}
+                                                    
+                                                    {/* Main image */}
+                                                    <View 
+                                                        className="absolute inset-0 rounded-t-xl overflow-hidden"
+                                                        style={{ zIndex: 1 }}
+                                                    >
+                                                        {publicUrl ? (
+                                                            <Image
+                                                                source={{ uri: publicUrl }}
+                                                                style={{ width: '100%', height: '100%', backgroundColor: '#e7e5e4' }}
+                                                                contentFit="cover"
+                                                                transition={200}
+                                                            />
+                                                        ) : (
+                                                            <View className="w-full h-full bg-gray-200 justify-center items-center">
+                                                                <Ionicons
+                                                                    name="image-outline"
+                                                                    size={24}
+                                                                    color="#9ca3af"
+                                                                />
+                                                            </View>
+                                                        )}
                                                     </View>
-                                                )}
+                                                </View>
                                                 <View className="p-2">
                                                     <Text
                                                         numberOfLines={1}
@@ -291,6 +384,20 @@ export function UnitSidePanel({
                     </View>
                 )}
             </View>
+
+            {/* Group Image Modal */}
+            {selectedGroup && (
+                <GroupImageModal
+                    visible={groupModalVisible}
+                    images={selectedGroup.images ?? []}
+                    groupName={selectedGroup.name}
+                    roomName={selectedGroup.room?.name ?? ''}
+                    onClose={() => {
+                        setGroupModalVisible(false);
+                        setSelectedGroup(null);
+                    }}
+                />
+            )}
         </Animated.View>
     );
 }

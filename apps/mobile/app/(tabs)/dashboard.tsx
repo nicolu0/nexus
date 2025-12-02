@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -65,15 +65,13 @@ function computeTenancyStatus(
     return 'Active';
 }
 
-// Outside component
-let hasAutoSelected = false;
-
 export default function DashboardScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [properties, setProperties] = useState<Property[]>([]);
     const [groups, setGroups] = useState<GroupRow[]>([]);
     const [activeSessionsMap, setActiveSessionsMap] = useState<Record<string, string>>({});
+    const [completedMoveInMap, setCompletedMoveInMap] = useState<Record<string, boolean>>({});
     const [tenancyMoveOutMap, setTenancyMoveOutMap] = useState<
         Record<string, boolean>
     >({});
@@ -88,19 +86,9 @@ export default function DashboardScreen() {
     const [unitModalVisible, setUnitModalVisible] = useState(false);
 
     const insets = useSafeAreaInsets();
+    const hasAutoSelectedRef = useRef(false);
     
-    useFocusEffect(
-        React.useCallback(() => {
-            setStatusBarStyle('dark');
-            loadDashboard();
-
-            return () => {
-                setShowPropertyMenu(false);
-            };
-        }, [])
-    );
-
-    const loadDashboard = async () => {
+    const loadDashboard = React.useCallback(async () => {
         try {
             // Don't set loading to true here if we want background refresh
             // or manage a separate refreshing state if using pull-to-refresh
@@ -147,8 +135,8 @@ export default function DashboardScreen() {
             const castProps = (propsData ?? []) as any as Property[];
             setProperties(castProps);
 
-            if (!hasAutoSelected && !selectedPropertyId && castProps.length > 0) {
-                hasAutoSelected = true;
+            if (!hasAutoSelectedRef.current && !selectedPropertyId && castProps.length > 0) {
+                hasAutoSelectedRef.current = true;
                 // Default to first, but try to find closest
                 let bestId = castProps[0].id;
 
@@ -193,29 +181,47 @@ export default function DashboardScreen() {
                 return;
             }
 
-            // 3) Fetch groups + images + room
-            const { data: groupData, error: groupsError } = await supabase
-                .from('groups')
-                .select(`
-                    id,
-                    name,
-                    tenancy_id,
-                    description,
-                    room:rooms (
-                    id,
-                    name
-                    ),
-                    images (
-                    id,
-                    path,
-                    session:sessions (
-                        phase,
-                        status
-                    )
-                    )
-                `)
-                .in('tenancy_id', tenancyIds);
+            // Parallel fetch for remaining data
+            const [groupsResult, sessionsResult, completedResult] = await Promise.all([
+                supabase
+                    .from('groups')
+                    .select(`
+                        id,
+                        name,
+                        tenancy_id,
+                        description,
+                        room:rooms (
+                        id,
+                        name
+                        ),
+                        images (
+                        id,
+                        path,
+                        created_at,
+                        session:sessions (
+                            phase,
+                            status
+                        )
+                        )
+                    `)
+                    .in('tenancy_id', tenancyIds),
+                
+                supabase
+                    .from('sessions')
+                    .select('id, tenancy_id')
+                    .in('tenancy_id', tenancyIds)
+                    .eq('status', 'in_progress'),
 
+                supabase
+                    .from('sessions')
+                    .select('tenancy_id')
+                    .in('tenancy_id', tenancyIds)
+                    .eq('phase', 'move_in')
+                    .eq('status', 'completed')
+            ]);
+
+            // 3) Process Groups
+            const { data: groupData, error: groupsError } = groupsResult;
             if (groupsError) throw groupsError;
 
             const castGroups = (groupData ?? []) as any as GroupRow[];
@@ -233,13 +239,8 @@ export default function DashboardScreen() {
             setTenancyMoveOutMap(moveOutMap);
 
 
-            // 5) Fetch active sessions for these tenancies
-            const { data: sessionsData } = await supabase
-                .from('sessions')
-                .select('id, tenancy_id')
-                .in('tenancy_id', tenancyIds)
-                .eq('status', 'in_progress');
-
+            // 5) Process Active Sessions
+            const { data: sessionsData } = sessionsResult;
             const sessionsMap: Record<string, string> = {};
             (sessionsData || []).forEach((s) => {
                 if (s.tenancy_id) {
@@ -248,12 +249,31 @@ export default function DashboardScreen() {
             });
             setActiveSessionsMap(sessionsMap);
 
+            // 6) Process Completed Move-ins
+            const { data: completedMoveIns } = completedResult;
+            const completedMap: Record<string, boolean> = {};
+            (completedMoveIns || []).forEach(s => {
+                if (s.tenancy_id) completedMap[s.tenancy_id] = true;
+            });
+            setCompletedMoveInMap(completedMap);
+
         } catch (err) {
             console.error('Error loading dashboard:', err);
         } finally {
             setLoading(false);
         }
-    }
+    }, [selectedPropertyId]); // Add selectedPropertyId to deps since it's used in auto-select logic (though hasAutoSelected guards it)
+
+    useFocusEffect(
+        React.useCallback(() => {
+            setStatusBarStyle('dark');
+            loadDashboard();
+
+            return () => {
+                setShowPropertyMenu(false);
+            };
+        }, [loadDashboard])
+    );
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
@@ -426,6 +446,7 @@ export default function DashboardScreen() {
                     roomFilterId={roomFilterId}
                     setRoomFilterId={setRoomFilterId}
                     activeSessionsMap={activeSessionsMap}
+                    completedMoveInMap={completedMoveInMap}
                 />
             </SafeAreaView>
         </View>

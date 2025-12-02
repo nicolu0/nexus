@@ -9,7 +9,8 @@ interface RoomSelectorProps {
     onSelectRoom: (room: string) => void;
     onCustomRoom: () => void;
     itemWidth: number;
-    tapTargetRef: React.MutableRefObject<string | null>;
+    tapTargetRef: { current: string | null };
+    isSelectedRoomCompleted?: boolean;
 }
 
 export function RoomSelector({
@@ -19,13 +20,22 @@ export function RoomSelector({
     onCustomRoom,
     itemWidth,
     tapTargetRef,
+    isSelectedRoomCompleted,
 }: RoomSelectorProps) {
     const flatListRef = useRef<FlatList>(null);
     const isIOS = Platform.OS === 'ios';
     const liquidAvailable = isIOS && isLiquidGlassAvailable();
+    const screenHeight = Dimensions.get('window').height;
+
+    const baseMargin = liquidAvailable ? 87 : 2;
+    const extraPadding = screenHeight > 900 ? 4 : 0;
+    const finalMargin = baseMargin + extraPadding;
 
     return (
-        <View className={`absolute bottom-0 left-0 right-0 h-12 z-20 ${liquidAvailable ? 'mb-24' : 'mb-1'}`}>
+        <View 
+            className="absolute bottom-0 left-0 right-0 h-12 z-20"
+            style={{ marginBottom: finalMargin }}
+        >
             <LinearGradient
                 colors={['rgba(0,0,0,0.8)', 'transparent']}
                 start={{ x: 0, y: 0 }}
@@ -46,6 +56,9 @@ export function RoomSelector({
                 keyExtractor={(item: string) => item}
                 viewabilityConfig={{
                     itemVisiblePercentThreshold: 50
+                }}
+                onScrollBeginDrag={() => {
+                    tapTargetRef.current = null;
                 }}
                 onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
                     if (tapTargetRef.current) return;
@@ -80,6 +93,8 @@ export function RoomSelector({
                             onPress={() => {
                                 if (item === '+ Custom') {
                                     onCustomRoom();
+                                } else if (item === selectedRoom) {
+                                    return;
                                 } else {
                                     tapTargetRef.current = item;
                                     flatListRef.current?.scrollToOffset({ offset: index * itemWidth, animated: true });
@@ -91,8 +106,8 @@ export function RoomSelector({
                             {isSelected && liquidAvailable ? (
                                 <GlassView
                                     glassEffectStyle="regular"
-                                    isInteractive={false}
-                                    tintColor="rgba(20, 20, 20, 0.6)"
+                                    isInteractive
+                                    tintColor={isSelectedRoomCompleted ? "rgba(0, 212, 146, 0.15)" : "rgba(20, 20, 20, 0.6)"}
                                     style={[
                                         {
                                             position: 'absolute',
@@ -106,7 +121,7 @@ export function RoomSelector({
                                 >
                                     <Text
                                         numberOfLines={1}
-                                        className="text-xs font-medium text-white px-3 text-center w-full"
+                                        className="text-sm font-medium text-white px-3 text-center w-full"
                                     >
                                         {item}
                                     </Text>
@@ -125,7 +140,7 @@ export function RoomSelector({
                                 >
                                     <Text
                                         numberOfLines={1}
-                                        className={`text-xs font-medium text-center w-full ${selectedRoom === item
+                                        className={`text-sm font-medium text-center w-full ${selectedRoom === item
                                             ? 'text-white'
                                             : 'text-white/60'
                                             }`}
@@ -152,6 +167,5 @@ export function RoomSelector({
 const styles = StyleSheet.create({
     glassPill: {
         borderRadius: 9999,
-        overflow: 'hidden',
     },
 });
