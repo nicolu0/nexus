@@ -36,17 +36,42 @@ export function ProfileMenu({ onSignOut, isOpen, onToggle }: ProfileMenuProps) {
             </TouchableOpacity>
 
             {isOpen && (
-                <View className="absolute top-12 right-0 bg-white rounded-xl shadow-lg py-2 w-32">
-                    <TouchableOpacity
-                        onPress={() => {
-                            onSignOut();
-                            onToggle();
-                        }}
-                        className="px-4 py-2 flex-row items-center"
-                    >
-                        <Ionicons name="log-out-outline" size={20} color="black" />
-                        <Text className="ml-2 text-black font-medium">Sign Out</Text>
-                    </TouchableOpacity>
+                <View className="absolute top-full mt-2 right-0 z-40 w-[100px]">
+                    {liquidAvailable ? (
+                        <GlassView
+                            glassEffectStyle="regular"
+                            tintColor="rgba(20, 20, 20, 0.6)"
+                            style={{
+                                borderRadius: 12,
+                                overflow: 'hidden',
+                                borderWidth: 1,
+                                borderColor: 'rgba(255, 255, 255, 0.1)',
+                                width: '100%',
+                            }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => {
+                                    onSignOut();
+                                    onToggle();
+                                }}
+                                className="px-4 py-2 flex-row items-center justify-center"
+                            >
+                                <Text className="text-white font-medium">Sign Out</Text>
+                            </TouchableOpacity>
+                        </GlassView>
+                    ) : (
+                        <View className="bg-stone-900/80 backdrop-blur-md rounded-xl border border-white/20 py-2 w-full">
+                            <TouchableOpacity
+                                onPress={() => {
+                                    onSignOut();
+                                    onToggle();
+                                }}
+                                className="px-4 py-2 flex-row items-center justify-center"
+                            >
+                                <Text className="text-white font-medium">Sign Out</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             )}
         </View>
