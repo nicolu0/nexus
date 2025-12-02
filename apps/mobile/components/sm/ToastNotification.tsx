@@ -110,7 +110,7 @@ export function ToastNotification({ message, type, onDismiss, topOverlayHeight, 
         };
     };
 
-    const topMargin = ((topOverlayHeight ?? 0) - insets.top) + 12;
+    const topMargin = ((topOverlayHeight ?? 0) - insets.top) + 8;
 
     return (
         <SafeAreaView className="absolute top-0 left-0 right-0 z-50" pointerEvents="box-none">

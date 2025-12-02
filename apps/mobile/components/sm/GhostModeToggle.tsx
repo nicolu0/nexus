@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { Switch, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface GhostModeToggleProps {
@@ -8,17 +8,22 @@ interface GhostModeToggleProps {
 }
 
 export function GhostModeToggle({ ghostMode, onToggle }: GhostModeToggleProps) {
+    const isOn = ghostMode === 'overlay';
+
     return (
-        <TouchableOpacity 
-            onPress={onToggle}
-            className="absolute left-[100px] bg-black/60 w-10 h-10 rounded-full justify-center items-center border border-white/20"
-        >
-            <Ionicons 
-                name={ghostMode === 'overlay' ? 'image-outline' : 'layers-outline'} 
-                size={20} 
-                color="white" 
+        <View className="absolute left-[100px] flex-row items-center gap-3">
+            <Switch
+                value={isOn}
+                onValueChange={onToggle}
+                trackColor={{ false: '#000000', true: '#ffffff' }}
+                thumbColor={isOn ? '#000000' : '#ffffff'}
             />
-        </TouchableOpacity>
+            <Ionicons 
+                name={isOn ? 'eye-outline' : 'eye-off-outline'} 
+                size={20} 
+                color="#ffffff" 
+            />
+        </View>
     );
 }
 
