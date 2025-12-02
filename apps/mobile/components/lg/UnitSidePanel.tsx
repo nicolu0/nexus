@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Animated, Dimensions, StyleSheet, Easing } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { RoomFilter } from '../sm/RoomFilter';
+import { GroupImageModal } from '../md/GroupImageModal';
 import { Unit, Property, Tenancy, GroupRow, Room, ImageRow } from '../../types';
 
 type UnitSidePanelProps = {
@@ -39,6 +40,8 @@ export function UnitSidePanel({
     const insets = useSafeAreaInsets();
     const screenWidth = Dimensions.get('window').width;
     const slideAnim = useRef(new Animated.Value(screenWidth)).current;
+    const [selectedGroup, setSelectedGroup] = useState<GroupRow | null>(null);
+    const [groupModalVisible, setGroupModalVisible] = useState(false);
 
     // Logic to determine if "Start Move-out" button should be shown in header
     const showStartMoveOut = selectedUnitMeta?.tenancy?.id 
@@ -277,31 +280,67 @@ export function UnitSidePanel({
 
                                     // Determine if ANY image in this group belongs to an in-progress session
                                     const isInProgress = item.images?.some(img => img.session?.status === 'in_progress');
+                                    
+                                    // Check if group has multiple images (move-in and move-out)
+                                    const hasMoveIn = item.images?.some(img => img.session?.phase === 'move_in') ?? false;
+                                    const hasMoveOut = item.images?.some(img => img.session?.phase === 'move_out') ?? false;
+                                    const hasMultipleImages = hasMoveIn && hasMoveOut && (item.images?.length ?? 0) > 1;
+
+                                    const handleGroupPress = () => {
+                                        if (hasMultipleImages) {
+                                            setSelectedGroup(item);
+                                            setGroupModalVisible(true);
+                                        }
+                                    };
 
                                     return (
                                         <View className="w-1/2 p-1">
                                             <TouchableOpacity 
-                                                className={`bg-white rounded-xl overflow-hidden ${isInProgress 
+                                                onPress={handleGroupPress}
+                                                disabled={!hasMultipleImages}
+                                                className={`bg-white rounded-xl overflow-visible ${isInProgress 
                                                     ? 'border border-dashed border-stone-300' 
                                                     : 'border border-gray-200'
-                                                }`}
+                                                } ${hasMultipleImages ? 'active:opacity-80' : ''}`}
                                             >
-                                                {publicUrl ? (
-                                                    <Image
-                                                        source={{ uri: publicUrl }}
-                                                        style={{ width: '100%', height: 112, backgroundColor: '#e7e5e4' }}
-                                                        contentFit="cover"
-                                                        transition={200}
-                                                    />
-                                                ) : (
-                                                    <View className="w-full h-28 bg-gray-200 justify-center items-center">
-                                                        <Ionicons
-                                                            name="image-outline"
-                                                            size={24}
-                                                            color="#9ca3af"
+                                                <View className="relative w-full" style={{ height: 112 }}>
+                                                    {/* Peeking box for multiple images */}
+                                                    {hasMultipleImages && (
+                                                        <View 
+                                                            className="absolute bg-stone-300 rounded-lg"
+                                                            style={{
+                                                                top: -4,
+                                                                left: 6,
+                                                                right: 6,
+                                                                height: 96,
+                                                                zIndex: 0,
+                                                            }}
                                                         />
+                                                    )}
+                                                    
+                                                    {/* Main image */}
+                                                    <View 
+                                                        className="absolute inset-0 rounded-t-xl overflow-hidden"
+                                                        style={{ zIndex: 1 }}
+                                                    >
+                                                        {publicUrl ? (
+                                                            <Image
+                                                                source={{ uri: publicUrl }}
+                                                                style={{ width: '100%', height: '100%', backgroundColor: '#e7e5e4' }}
+                                                                contentFit="cover"
+                                                                transition={200}
+                                                            />
+                                                        ) : (
+                                                            <View className="w-full h-full bg-gray-200 justify-center items-center">
+                                                                <Ionicons
+                                                                    name="image-outline"
+                                                                    size={24}
+                                                                    color="#9ca3af"
+                                                                />
+                                                            </View>
+                                                        )}
                                                     </View>
-                                                )}
+                                                </View>
                                                 <View className="p-2">
                                                     <Text
                                                         numberOfLines={1}
@@ -345,6 +384,20 @@ export function UnitSidePanel({
                     </View>
                 )}
             </View>
+
+            {/* Group Image Modal */}
+            {selectedGroup && (
+                <GroupImageModal
+                    visible={groupModalVisible}
+                    images={selectedGroup.images ?? []}
+                    groupName={selectedGroup.name}
+                    roomName={selectedGroup.room?.name ?? ''}
+                    onClose={() => {
+                        setGroupModalVisible(false);
+                        setSelectedGroup(null);
+                    }}
+                />
+            )}
         </Animated.View>
     );
 }

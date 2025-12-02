@@ -197,6 +197,7 @@ export default function DashboardScreen() {
                         images (
                         id,
                         path,
+                        created_at,
                         session:sessions (
                             phase,
                             status

@@ -30,6 +30,7 @@ export type Room = {
 export type ImageRow = {
     id: string;
     path: string;
+    created_at?: string;
     session?: { 
         phase: string;
         status: string;
