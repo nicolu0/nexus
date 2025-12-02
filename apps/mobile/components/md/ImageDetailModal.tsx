@@ -15,6 +15,7 @@ type ImageDetailModalProps = {
     onSave: (newRoomId: string, newRoomName: string) => Promise<void>;
     onDelete: () => Promise<void>;
     isCompleted?: boolean;
+    isMoveOut?: boolean;
 };
 
 export function ImageDetailModal({
@@ -26,7 +27,8 @@ export function ImageDetailModal({
     onClose,
     onSave,
     onDelete,
-    isCompleted = false
+    isCompleted = false,
+    isMoveOut = false
 }: ImageDetailModalProps) {
     const [currentRoom, setCurrentRoom] = useState(roomName);
     const [showDropdown, setShowDropdown] = useState(false);
@@ -59,6 +61,8 @@ export function ImageDetailModal({
     const [deleting, setDeleting] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const insets = useSafeAreaInsets();
+
+    const isReadOnlyTag = isCompleted || isMoveOut;
 
     useEffect(() => {
         Animated.timing(fadeAnim, {
@@ -165,9 +169,9 @@ export function ImageDetailModal({
                                     />
                                 </View>
 
-                                {/* Top Left Tag (Room) - Editable */}
+                                {/* Top Left Tag (Room) - Editable unless completed or move-out */}
                                 <View className="absolute top-4 left-4 z-20">
-                                    {isCompleted ? (
+                                    {isReadOnlyTag ? (
                                         <View className="bg-black/60 px-3 py-1.5 rounded-full flex-row items-center border border-white/20 backdrop-blur-md">
                                             <Text className="text-white font-semibold text-sm">{currentRoom || 'Unknown Room'}</Text>
                                         </View>
@@ -181,7 +185,7 @@ export function ImageDetailModal({
                                         </TouchableOpacity>
                                     )}
                                     
-                                    {showDropdown && !isCompleted && (
+                                    {showDropdown && !isReadOnlyTag && (
                                         <View className="absolute top-full left-0 mt-2 w-48 bg-black/80 rounded-lg shadow-xl overflow-hidden max-h-60 z-30 backdrop-blur-md border border-white/10">
                                             <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={true}>
                                                 {availableRooms.map((room, index) => (
@@ -212,25 +216,43 @@ export function ImageDetailModal({
                                 </View>
                             </View>
 
-                            {/* Actions - Only show if not completed */}
+                            {/* Actions */}
                             {!isCompleted && (
-                                <View className="flex-row justify-center gap-6 mt-4">
-                                    <TouchableOpacity 
-                                        onPress={handleDelete}
-                                        disabled={saving || deleting}
-                                        className={`bg-red-500 px-8 py-3 rounded-full shadow-lg flex-row items-center justify-center min-w-[120px] ${deleting ? 'opacity-80' : ''}`}
-                                    >
-                                        {deleting ? <ActivityIndicator color="white" size="small" /> : <Text className="font-semibold text-white text-base">Delete</Text>}
-                                    </TouchableOpacity>
+                                isMoveOut ? (
+                                    // Move-out sessions: only allow delete, centered under image
+                                    <View className="items-center mt-4">
+                                        <TouchableOpacity 
+                                            onPress={handleDelete}
+                                            disabled={deleting}
+                                            className={`bg-red-500 px-8 py-3 rounded-full shadow-lg flex-row items-center justify-center min-w-[120px] ${deleting ? 'opacity-80' : ''}`}
+                                        >
+                                            {deleting ? (
+                                                <ActivityIndicator color="white" size="small" />
+                                            ) : (
+                                                <Text className="font-semibold text-white text-base">Delete</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : (
+                                    // Move-in / other sessions: allow delete and save
+                                    <View className="flex-row justify-center gap-6 mt-4">
+                                        <TouchableOpacity 
+                                            onPress={handleDelete}
+                                            disabled={saving || deleting}
+                                            className={`bg-red-500 px-8 py-3 rounded-full shadow-lg flex-row items-center justify-center min-w-[120px] ${deleting ? 'opacity-80' : ''}`}
+                                        >
+                                            {deleting ? <ActivityIndicator color="white" size="small" /> : <Text className="font-semibold text-white text-base">Delete</Text>}
+                                        </TouchableOpacity>
 
-                                    <TouchableOpacity 
-                                        onPress={handleSave}
-                                        disabled={saving || deleting || currentRoom === roomName}
-                                        className={`bg-white px-8 py-3 rounded-full shadow-lg flex-row items-center justify-center min-w-[120px] ${saving || currentRoom === roomName ? 'opacity-40' : ''}`}
-                                    >
-                                        {saving ? <ActivityIndicator color="black" size="small" /> : <Text className="font-semibold text-black text-base">Save</Text>}
-                                    </TouchableOpacity>
-                                </View>
+                                        <TouchableOpacity 
+                                            onPress={handleSave}
+                                            disabled={saving || deleting || currentRoom === roomName}
+                                            className={`bg-white px-8 py-3 rounded-full shadow-lg flex-row items-center justify-center min-w-[120px] ${saving || currentRoom === roomName ? 'opacity-40' : ''}`}
+                                        >
+                                            {saving ? <ActivityIndicator color="black" size="small" /> : <Text className="font-semibold text-black text-base">Save</Text>}
+                                        </TouchableOpacity>
+                                    </View>
+                                )
                             )}
 
                          </TouchableOpacity>

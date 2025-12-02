@@ -227,6 +227,7 @@ export function SessionSidePanel({
                         onRefreshSessions?.();
                     }}
                     isCompleted={selectedSession?.status === 'completed'}
+                    isMoveOut={selectedSession?.phase === 'move_out'}
                 />
             )}
         </Animated.View>
