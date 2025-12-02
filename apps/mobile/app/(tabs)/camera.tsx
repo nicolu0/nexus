@@ -83,6 +83,7 @@ export default function CameraScreen() {
     const params = useLocalSearchParams<{ phase?: string; unitId?: string; sessionId?: string }>();
     const [topControlsHeight, setTopControlsHeight] = useState(0);
     const [ghostGroups, setGhostGroups] = useState<{ id: string; room_id: string; imagePath: string }[]>([]);
+    const [ghostGroupsLoaded, setGhostGroupsLoaded] = useState(false);
     const [ghostMode, setGhostMode] = useState<'overlay' | 'thumbnail'>('overlay');
     
     // We'll derive phase/session info from database state instead of params for robustness
@@ -174,6 +175,7 @@ export default function CameraScreen() {
 
     const fetchGhostGroups = useCallback(async (tenancyId: string) => {
         try {
+            setGhostGroupsLoaded(false);
             const { data, error } = await supabase
                 .from('groups')
                 .select(`
@@ -208,8 +210,11 @@ export default function CameraScreen() {
             });
 
             setGhostGroups(ghosts);
+            setGhostGroupsLoaded(true);
         } catch (e) {
             console.error('Error fetching ghost groups:', e);
+            setGhostGroups([]);
+            setGhostGroupsLoaded(true);
         }
     }, []);
 
@@ -218,6 +223,7 @@ export default function CameraScreen() {
             fetchGhostGroups(activeSession.tenancy_id);
         } else {
             setGhostGroups([]);
+            setGhostGroupsLoaded(false);
         }
     }, [activeSession, fetchGhostGroups]);
 
@@ -699,6 +705,17 @@ export default function CameraScreen() {
         ? supabase.storage.from('unit-images').getPublicUrl(currentGhostGroup.imagePath).data.publicUrl 
         : null;
 
+    // Check if selected room is completed (all move-in photos matched) during move-out phase
+    // Only mark as completed if we're in move-out phase, have a selected room with a roomId,
+    // ghostGroups has been loaded, and the room is NOT in ghostGroups (meaning all move-in photos are matched)
+    const isSelectedRoomCompleted = Boolean(
+        activeSession?.phase === 'move_out' && 
+        selectedRoom && 
+        roomIdMap[selectedRoom] &&
+        ghostGroupsLoaded && // Only mark as completed if ghostGroups has been loaded
+        !ghostGroups.some(g => g.room_id === roomIdMap[selectedRoom])
+    );
+
     return (
         <View className="flex-1 bg-black">
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} />
@@ -778,6 +795,7 @@ export default function CameraScreen() {
                     activeSessionPhase={activeSession?.phase}
                     ghostMode={ghostImageUrl ? ghostMode : undefined}
                     onToggleGhostMode={ghostImageUrl ? handleToggleGhostMode : undefined}
+                    isSelectedRoomCompleted={isSelectedRoomCompleted}
                 />
             </View>
 

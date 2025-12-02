@@ -17,6 +17,7 @@ interface CameraBottomControlsProps {
     activeSessionPhase?: string;
     ghostMode?: 'overlay' | 'thumbnail';
     onToggleGhostMode?: () => void;
+    isSelectedRoomCompleted?: boolean;
 }
 
 export function CameraBottomControls({
@@ -31,6 +32,7 @@ export function CameraBottomControls({
     activeSessionPhase,
     ghostMode,
     onToggleGhostMode,
+    isSelectedRoomCompleted,
 }: CameraBottomControlsProps) {
     const isIOS = Platform.OS === 'ios';
     const liquidAvailable = isIOS && isLiquidGlassAvailable();
@@ -61,6 +63,7 @@ export function CameraBottomControls({
                 onCustomRoom={onCustomRoom}
                 itemWidth={itemWidth}
                 tapTargetRef={tapTargetRef}
+                isSelectedRoomCompleted={isSelectedRoomCompleted}
             />
         </>
     );

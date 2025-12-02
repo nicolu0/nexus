@@ -137,7 +137,7 @@ export function ToastNotification({ message, type, onDismiss, topOverlayHeight, 
                             size={18} 
                             color={type === 'success' ? '#10b981' : '#ef4444'} 
                         />
-                        <Text className={`font-medium flex-1 ${type === 'success' ? 'text-emerald-600' : 'text-red-500'
+                        <Text className={`font-medium flex-1 ${type === 'success' ? 'text-emerald-500' : 'text-red-500'
                             }`}>
                             {message}
                         </Text>

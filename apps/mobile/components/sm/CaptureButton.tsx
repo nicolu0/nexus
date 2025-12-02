@@ -19,7 +19,7 @@ export function CaptureButton({
     return (
         <>
             {activeSessionPhase && (
-                <View className="absolute right-[100px] bg-black/60 px-3 py-1.5 rounded-full border border-white/20">
+                <View className="absolute right-[100px] bg-black/60 px-3 py-1.5 mr-4 rounded-full border border-white/20">
                     <Text className="text-white text-xs font-medium capitalize whitespace-nowrap">
                         {activeSessionPhase.replace('_', ' ')}
                     </Text>

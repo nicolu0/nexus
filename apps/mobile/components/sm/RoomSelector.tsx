@@ -10,6 +10,7 @@ interface RoomSelectorProps {
     onCustomRoom: () => void;
     itemWidth: number;
     tapTargetRef: { current: string | null };
+    isSelectedRoomCompleted?: boolean;
 }
 
 export function RoomSelector({
@@ -19,6 +20,7 @@ export function RoomSelector({
     onCustomRoom,
     itemWidth,
     tapTargetRef,
+    isSelectedRoomCompleted,
 }: RoomSelectorProps) {
     const flatListRef = useRef<FlatList>(null);
     const isIOS = Platform.OS === 'ios';
@@ -105,7 +107,7 @@ export function RoomSelector({
                                 <GlassView
                                     glassEffectStyle="regular"
                                     isInteractive
-                                    tintColor="rgba(20, 20, 20, 0.6)"
+                                    tintColor={isSelectedRoomCompleted ? "rgba(0, 212, 146, 0.15)" : "rgba(20, 20, 20, 0.6)"}
                                     style={[
                                         {
                                             position: 'absolute',
