@@ -584,13 +584,13 @@ export default function CameraScreen() {
             return;
         }
 
-        if (!selectedRoom) {
-            Alert.alert('Select Room', 'Please select a room before taking a photo.');
+        if (!activeSession) {
+            showToast('Start a session in dashboard to take photos!', 'error');
             return;
         }
 
-        if (!activeSession) {
-            showToast('Start a session in dashboard to take photos!', 'error');
+        if (!selectedRoom) {
+            Alert.alert('Select Room', 'Please select a room before taking a photo.');
             return;
         }
 
