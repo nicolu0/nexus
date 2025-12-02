@@ -84,7 +84,7 @@ export default function CameraScreen() {
     const [topControlsHeight, setTopControlsHeight] = useState(0);
     const [ghostGroups, setGhostGroups] = useState<{ id: string; room_id: string; imagePath: string }[]>([]);
     const [ghostGroupsLoaded, setGhostGroupsLoaded] = useState(false);
-    const [ghostMode, setGhostMode] = useState<'overlay' | 'thumbnail'>('overlay');
+    const [ghostMode, setGhostMode] = useState<'overlay' | 'thumbnail'>('thumbnail');
     
     // We'll derive phase/session info from database state instead of params for robustness
     const [activeSession, setActiveSession] = useState<{ id: string; phase: 'move_in' | 'move_out'; tenancy_id: string } | null>(null);
