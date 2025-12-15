@@ -274,13 +274,6 @@ export default function CameraScreen() {
                     phase: session.phase as 'move_in' | 'move_out',
                     tenancy_id: session.tenancy_id!
                 });
-
-                // If explicitly passed via navigation or simply on load, we might want to sync state
-                // But if the user manually navigated to camera and we found a session, we should probably select it
-                // However, the `unitId` argument comes from `selectedUnit`, so we're already looking at that unit.
-                // The only case to handle is setting property/unit if `fetchActiveSession` was called with an ID 
-                // that ISN'T currently selected (e.g. from params).
-                
             } else {
                 setActiveSession(null);
             }
@@ -655,7 +648,6 @@ export default function CameraScreen() {
                     console.log('Image metadata saved to database');
                     showToast('Photo saved!', 'success');
                     
-                    // If we filled a ghost group, refresh the list so the overlay disappears
                     if (targetGhostGroup && activeSession?.tenancy_id) {
                         fetchGhostGroups(activeSession.tenancy_id);
                     }
@@ -705,14 +697,11 @@ export default function CameraScreen() {
         ? supabase.storage.from('unit-images').getPublicUrl(currentGhostGroup.imagePath).data.publicUrl 
         : null;
 
-    // Check if selected room is completed (all move-in photos matched) during move-out phase
-    // Only mark as completed if we're in move-out phase, have a selected room with a roomId,
-    // ghostGroups has been loaded, and the room is NOT in ghostGroups (meaning all move-in photos are matched)
     const isSelectedRoomCompleted = Boolean(
         activeSession?.phase === 'move_out' && 
         selectedRoom && 
         roomIdMap[selectedRoom] &&
-        ghostGroupsLoaded && // Only mark as completed if ghostGroups has been loaded
+        ghostGroupsLoaded &&
         !ghostGroups.some(g => g.room_id === roomIdMap[selectedRoom])
     );
 
